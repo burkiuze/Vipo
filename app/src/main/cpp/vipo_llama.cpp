@@ -7,6 +7,7 @@
 #include <jni.h>
 #include <android/log.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <unistd.h>
