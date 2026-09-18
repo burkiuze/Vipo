@@ -2,7 +2,6 @@ package com.example.ui.onboarding
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -130,7 +129,7 @@ fun OnboardingScreen(
                         Text(
                             text = "Detected Hardware",
                             style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center
                         )
@@ -170,7 +169,7 @@ fun OnboardingScreen(
                         Text(
                             text = "Choose Your Starter Model",
                             style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center
                         )
@@ -189,7 +188,6 @@ fun OnboardingScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
                                 .padding(16.dp)
                         ) {
                             Row(
@@ -201,13 +199,13 @@ fun OnboardingScreen(
                                     Text(
                                         text = "RECOMMENDED STARTER",
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
                                         text = "Llama 3.2 1B Instruct",
                                         style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
@@ -352,7 +350,7 @@ private fun OnboardingPageLayout(
                 text = badge,
                 color = iconTint,
                 fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Medium
             )
         }
 
@@ -361,7 +359,7 @@ private fun OnboardingPageLayout(
         Text(
             text = title,
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
             lineHeight = 36.sp

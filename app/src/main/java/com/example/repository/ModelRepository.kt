@@ -101,6 +101,9 @@ class ModelRepository(private val context: Context) {
     }
 
     suspend fun refreshDownloadedModels(): List<DownloadedModel> = withContext(Dispatchers.IO) {
+        // Downloaded files are matched against the catalog, so it has to be loaded first.
+        if (_catalog.value.isEmpty()) loadCatalog()
+
         val modelsDir = File(context.filesDir, "models")
         if (!modelsDir.exists()) modelsDir.mkdirs()
 
