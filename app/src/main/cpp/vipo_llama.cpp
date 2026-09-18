@@ -8,6 +8,7 @@
 #include <android/log.h>
 
 #include <algorithm>
+#include <atomic>
 #include <string>
 #include <vector>
 #include <unistd.h>
@@ -38,7 +39,8 @@ struct vipo_session {
     int n_prompt_tokens = 0;
     int n_decoded = 0;
     int n_predict = 512;
-    bool stop_requested = false;
+    // Written from the UI thread while generation runs on the engine thread.
+    std::atomic<bool> stop_requested { false };
     bool finished = true;
     bool supports_thinking = false;
     std::string thinking_start;
@@ -257,7 +259,7 @@ Java_com_example_engine_LlamaNative_nativeStartCompletion(
     session->pos = 0;
     session->n_decoded = 0;
     session->n_prompt_tokens = 0;
-    session->stop_requested = false;
+    session->stop_requested.store(false);
     session->finished = false;
     session->pending_utf8.clear();
     session->n_predict = n_predict > 0 ? n_predict : 512;
@@ -339,7 +341,7 @@ Java_com_example_engine_LlamaNative_nativeNextToken(JNIEnv * env, jobject, jlong
         return nullptr;
     }
 
-    if (session->stop_requested ||
+    if (session->stop_requested.load() ||
         session->n_decoded >= session->n_predict ||
         session->pos >= session->n_ctx - CONTEXT_HEADROOM) {
         session->finished = true;
@@ -378,7 +380,7 @@ JNIEXPORT void JNICALL
 Java_com_example_engine_LlamaNative_nativeStopCompletion(JNIEnv *, jobject, jlong handle) {
     auto * session = as_session(handle);
     if (session != nullptr) {
-        session->stop_requested = true;
+        session->stop_requested.store(true);
     }
 }
 
