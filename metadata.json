@@ -1,0 +1,7 @@
+{
+  "name": "Vipo",
+  "description": "Privacy-first local AI that runs downloadable GGUF models completely offline on your device.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
