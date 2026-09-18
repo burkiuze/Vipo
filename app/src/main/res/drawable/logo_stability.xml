@@ -1,0 +1,8 @@
+<!-- Bar mark for Stability AI's StableLM models. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#C81BFF" android:pathData="M8,8h32v8H8z" />
+    <path android:fillColor="#9B24F2" android:pathData="M14,20h26v8H14z" />
+    <path android:fillColor="#6B2CE5" android:pathData="M8,32h26v8H8z" />
+</vector>

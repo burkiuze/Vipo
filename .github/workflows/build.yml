@@ -29,11 +29,20 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Run unit tests
-        run: gradle testDebugUnitTest --stacktrace
+      # Reuse the NDK that ships with the runner image instead of downloading one.
+      - name: Detect Android NDK
+        id: ndk
+        run: |
+          NDK_VERSION=$(ls "$ANDROID_SDK_ROOT/ndk" | sort -V | tail -1)
+          echo "Using NDK $NDK_VERSION"
+          echo "version=$NDK_VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Run unit tests
+        run: gradle testDebugUnitTest --stacktrace -Pvipo.ndkVersion=${{ steps.ndk.outputs.version }}
+
+      # Builds llama.cpp from source for arm64-v8a, so this step takes a while on a cold cache.
       - name: Build debug APK
-        run: gradle assembleDebug --stacktrace
+        run: gradle assembleDebug --stacktrace -Pvipo.ndkVersion=${{ steps.ndk.outputs.version }}
 
       - name: Collect APK
         run: |

@@ -13,6 +13,11 @@ android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
+  // CI passes the NDK that is already installed on the runner so nothing has to be downloaded.
+  (project.findProperty("vipo.ndkVersion") as String?)?.takeIf { it.isNotBlank() }?.let {
+    ndkVersion = it
+  }
+
   defaultConfig {
     applicationId = "com.aistudio.vipo.offline"
     minSdk = 24
@@ -21,6 +26,24 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    // llama.cpp is built from source for 64-bit ARM, which is what every phone that can
+    // realistically run a local model uses. Other ABIs fall back to "no engine available".
+    ndk { abiFilters += listOf("arm64-v8a") }
+
+    externalNativeBuild {
+      cmake {
+        arguments += listOf("-DANDROID_STL=c++_static", "-DCMAKE_BUILD_TYPE=Release")
+        cppFlags += "-O3"
+      }
+    }
+  }
+
+  externalNativeBuild {
+    cmake {
+      path = file("src/main/cpp/CMakeLists.txt")
+      version = "3.31.6"
+    }
   }
 
   // Keystores are not checked in, so only wire them up when they are actually present -

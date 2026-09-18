@@ -1,0 +1,9 @@
+<!-- Falcon wing mark for TII's Falcon models. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#1FA98F"
+        android:pathData="M6,14c8,0 14,3 18,8l14,-8 -6,12 8,4 -12,4 -4,10 -6,-9c-7,-2 -12,-8 -12,-15z" />
+    <path android:fillColor="#0E6F5E"
+        android:pathData="M24,22l14,-8 -6,12z" />
+</vector>

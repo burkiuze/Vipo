@@ -12,6 +12,8 @@ import com.example.data.model.DownloadedModel
 import com.example.data.model.InferenceParams
 import com.example.data.model.PerformanceStats
 import com.example.data.model.PluginRegistry
+import com.example.data.model.ReasoningText
+import com.example.engine.ChatTurn
 import com.example.engine.InferenceEngine
 import com.example.engine.LlamaCppInferenceEngine
 import com.example.engine.LoadResult
@@ -67,6 +69,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     private var activeGenerationJob: Job? = null
+
+    private companion object {
+        /** Older turns are dropped so the prompt keeps fitting into small mobile contexts. */
+        const val MAX_HISTORY_MESSAGES = 20
+    }
 
     init {
         viewModelScope.launch {
@@ -172,7 +179,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 content = text
             )
 
-            executeInference(conv.id, text, conv.systemPrompt)
+            executeInference(conv.id, conv.systemPrompt)
         }
     }
 
@@ -188,7 +195,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             conversationRepository.deleteMessagesFrom(conv.id, lastUserMsg.timestamp + 1)
             _uiState.update { it.copy(isGenerating = true, streamingContent = "") }
 
-            executeInference(conv.id, lastUserMsg.content, conv.systemPrompt)
+            executeInference(conv.id, conv.systemPrompt)
         }
     }
 
@@ -219,20 +226,37 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
             // Delete subsequent messages and generate anew
             conversationRepository.deleteMessagesFrom(conv.id, targetMsg.timestamp + 1)
-            executeInference(conv.id, newText, conv.systemPrompt)
+            executeInference(conv.id, conv.systemPrompt)
         }
     }
 
-    private fun executeInference(conversationId: String, prompt: String, systemPrompt: String) {
+    /**
+     * Sends the whole conversation to the model. The stored messages are the source of truth, so
+     * the model sees the same history the user sees, minus earlier reasoning blocks.
+     */
+    private fun executeInference(conversationId: String, systemPrompt: String) {
         activeGenerationJob?.cancel()
         activeGenerationJob = viewModelScope.launch {
             val params = settingsDataStore.inferenceParams.first()
             val enabledPlugins = settingsDataStore.enabledPluginIds.first()
             val effectiveSystemPrompt = PluginRegistry.buildSystemPrompt(systemPrompt, enabledPlugins)
+            val history = conversationRepository.getMessagesOnce(conversationId)
+                .filter { it.role == "user" || it.role == "assistant" }
+                .takeLast(MAX_HISTORY_MESSAGES)
+                .map { message ->
+                    ChatTurn(
+                        role = message.role,
+                        content = if (message.role == "assistant") {
+                            ReasoningText.answerOf(message.content)
+                        } else {
+                            message.content
+                        }
+                    )
+                }
             val fullResponseBuilder = StringBuilder()
 
             try {
-                engine.generate(prompt, effectiveSystemPrompt, params).collect { chunk ->
+                engine.generate(history, effectiveSystemPrompt, params).collect { chunk ->
                     if (chunk.token.isNotEmpty()) {
                         fullResponseBuilder.append(chunk.token)
                         _uiState.update {
@@ -245,7 +269,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
                     if (chunk.isFinished) {
                         val finalResponse = fullResponseBuilder.toString().ifBlank {
-                            "Response generated on local device."
+                            "(no output)"
                         }
                         val stats = chunk.stats ?: engine.getPerformanceStats()
 

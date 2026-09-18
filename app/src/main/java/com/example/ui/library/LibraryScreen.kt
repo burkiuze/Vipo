@@ -225,7 +225,57 @@ fun LibraryScreen(
                 DeviceSpecsCard(hardwareInfo = viewModel.hardwareInfo)
             }
 
-            items(models, key = { it.id }) { model ->
+            val installedIds = downloadedModels.mapNotNull { it.modelId }.toSet()
+            val installed = models.filter { installedIds.contains(it.id) }
+            val available = models.filterNot { installedIds.contains(it.id) }
+
+            if (installed.isNotEmpty()) {
+                item(key = "header-installed") { SectionHeader("On this device") }
+            }
+
+            items(installed, key = { "installed-${it.id}" }) { model ->
+                val selectedVariant = uiState.selectedVariants[model.id]
+                    ?: model.variants.firstOrNull { it.name.contains("Q4") }
+                    ?: model.variants.first()
+
+                val downloadedModel = downloadedModels.firstOrNull { it.modelId == model.id }
+                val isLoaded = downloadedModel != null && viewModel.engine.activeModelPath == downloadedModel.filePath
+
+                ModelListItem(
+                    model = model,
+                    selectedVariant = selectedVariant,
+                    compatibility = viewModel.getCompatibility(selectedVariant),
+                    expanded = uiState.expandedModelId == model.id,
+                    highlighted = uiState.highlightedModelId == model.id,
+                    downloadedModel = downloadedModel,
+                    isLoaded = isLoaded,
+                    downloadTask = downloadTasks[model.id],
+                    isFavorite = favoriteIds.contains(model.id),
+                    onToggleExpanded = { viewModel.toggleExpanded(model.id) },
+                    onVariantSelect = { viewModel.selectVariant(model.id, it) },
+                    onDownloadClick = { viewModel.startDownload(model, selectedVariant) },
+                    onPauseDownload = { viewModel.pauseDownload(model.id) },
+                    onResumeDownload = { viewModel.resumeDownload(model.id) },
+                    onCancelDownload = { viewModel.cancelDownload(model.id) },
+                    onRetryDownload = { viewModel.retryDownload(model.id) },
+                    onLoadModel = {
+                        downloadedModel?.let { viewModel.loadModel(it.filePath, model.name) }
+                    },
+                    onChatWithModel = {
+                        downloadedModel?.let { onOpenChatWithModel(it.filePath, model.name) }
+                    },
+                    onDeleteModel = {
+                        downloadedModel?.let { viewModel.deleteModel(it) }
+                    },
+                    onToggleFavorite = { viewModel.toggleFavorite(model.id) }
+                )
+            }
+
+            if (available.isNotEmpty()) {
+                item(key = "header-browse") { SectionHeader("Browse models") }
+            }
+
+            items(available, key = { "browse-${it.id}" }) { model ->
                 val selectedVariant = uiState.selectedVariants[model.id]
                     ?: model.variants.firstOrNull { it.name.contains("Q4") }
                     ?: model.variants.first()
@@ -300,6 +350,16 @@ fun LibraryScreen(
             onDownload = { url, name -> viewModel.downloadFromUrl(url, name) }
         )
     }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
+    )
 }
 
 @Composable

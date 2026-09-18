@@ -32,6 +32,9 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Extension
@@ -83,6 +86,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.local.ChatMessageEntity
+import com.example.data.model.ReasoningText
 import com.example.ui.components.ModelLogo
 import com.example.ui.components.NavigationDrawerContent
 import com.example.ui.components.PerformanceStatsDialog
@@ -340,7 +344,9 @@ fun ChatScreen(
                                 onStartEdit = { viewModel.startEditMessage(message.id, message.content) },
                                 onCopy = {
                                     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    cm.setPrimaryClip(ClipData.newPlainText("Vipo", message.content))
+                                    cm.setPrimaryClip(
+                                        ClipData.newPlainText("Vipo", ReasoningText.answerOf(message.content))
+                                    )
                                     Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
                                 },
                                 onRegenerate = { viewModel.regenerateLastMessage() }
@@ -596,6 +602,62 @@ private fun QuickAction(icon: ImageVector, label: String, onClick: () -> Unit) {
     }
 }
 
+/**
+ * Reasoning models stream a scratchpad before the answer. It is collapsed by default and opens
+ * while the model is still thinking, so the user can see it is working.
+ */
+@Composable
+fun ThinkingSection(
+    thinking: String,
+    isStreaming: Boolean
+) {
+    var expanded by remember(isStreaming) { mutableStateOf(isStreaming) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Psychology,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = if (isStreaming) "Thinking..." else "Thought process",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) "Hide" else "Show",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+
+        if (expanded && thinking.isNotBlank()) {
+            Text(
+                text = thinking,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
+            )
+        }
+    }
+}
+
 @Composable
 fun ChatMessageBubble(
     message: ChatMessageEntity,
@@ -651,13 +713,23 @@ fun ChatMessageBubble(
                     )
                 }
             } else {
-                // Assistant replies read as plain text, no container.
-                Text(
-                    text = message.content,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                val parsed = remember(message.content) { ReasoningText.split(message.content) }
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    if (parsed.hasThinking) {
+                        ThinkingSection(
+                            thinking = parsed.thinking,
+                            isStreaming = false
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+                    // Assistant replies read as plain text, no container.
+                    Text(
+                        text = parsed.answer,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
 
             Row(
@@ -713,16 +785,32 @@ fun StreamingAssistantBubble(
     showStats: Boolean,
     onStop: () -> Unit
 ) {
+    val parsed = remember(content) { ReasoningText.split(content) }
+
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = if (content.isEmpty()) "Thinking on device..." else content,
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (content.isEmpty()) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.onSurface
+        if (parsed.hasThinking) {
+            ThinkingSection(
+                thinking = parsed.thinking,
+                isStreaming = parsed.isThinkingOpen
+            )
+            if (parsed.answer.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
             }
-        )
+        }
+
+        if (parsed.answer.isNotEmpty()) {
+            Text(
+                text = parsed.answer,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        } else if (!parsed.hasThinking) {
+            Text(
+                text = "Working on device...",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
 
         Spacer(modifier = Modifier.height(6.dp))
 

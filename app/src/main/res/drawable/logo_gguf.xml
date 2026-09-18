@@ -1,0 +1,8 @@
+<!-- Neutral mark for imported or unrecognised GGUF files. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#8A8A94"
+        android:pathData="M24,5l16,9v20l-16,9 -16,-9V14zM24,10.2L12.5,16.8v13.4L24,36.8l11.5,-6.6V16.8z" />
+    <path android:fillColor="#8A8A94" android:pathData="M24,18l8,4.6v9.2L24,36.4l-8,-4.6v-9.2z" />
+</vector>
