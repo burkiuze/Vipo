@@ -300,7 +300,7 @@ fun OnboardingScreen(
                             .height(48.dp),
                         shape = RoundedCornerShape(14.dp)
                     ) {
-                        Text("Browse Full Model Hub", fontWeight = FontWeight.Medium)
+                        Text("Browse the library", fontWeight = FontWeight.Medium)
                     }
                 }
             }

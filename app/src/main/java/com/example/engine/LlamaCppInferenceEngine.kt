@@ -145,7 +145,7 @@ class LlamaCppInferenceEngine : InferenceEngine {
         val startTime = SystemClock.elapsedRealtime()
 
         if (!isLoaded) {
-            emit(GenerationChunk(token = "Error: No local GGUF model is loaded. Please select or download a model from Model Hub.", isFinished = true))
+            emit(GenerationChunk(token = "Error: No local GGUF model is loaded. Please select or download a model from the library.", isFinished = true))
             return@flow
         }
 

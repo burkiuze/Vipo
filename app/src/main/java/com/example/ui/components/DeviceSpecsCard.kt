@@ -1,7 +1,6 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,29 +11,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.data.model.CompatibilityLevel
 import com.example.data.model.DeviceHardwareInfo
 import com.example.ui.theme.VipoAmber
@@ -42,6 +31,7 @@ import com.example.ui.theme.VipoGreen
 import com.example.ui.theme.VipoOrange
 import com.example.ui.theme.VipoRed
 
+/** Compact, flat readout of what this device can run. */
 @Composable
 fun DeviceSpecsCard(
     hardwareInfo: DeviceHardwareInfo,
@@ -51,127 +41,86 @@ fun DeviceSpecsCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
-            .padding(16.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(14.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Memory,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(
-                        text = hardwareInfo.deviceName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "${hardwareInfo.cpuCores} CPU Cores • Hardware Detected",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = hardwareInfo.deviceName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${hardwareInfo.cpuCores} cores · ${hardwareInfo.availableRamGb} GB RAM free · " +
+                        "${hardwareInfo.freeStorageGb} GB storage free",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             if (onAutoSelectClick != null) {
-                Button(
-                    onClick = onAutoSelectClick,
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ),
-                    contentPadding = ButtonDefaults.ContentPadding
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Bolt,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
+                TextButton(onClick = onAutoSelectClick) {
+                    Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(15.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Auto Select", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Auto select", style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // RAM Bar
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "RAM Available",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "${hardwareInfo.availableRamGb} GB free / ${hardwareInfo.totalRamGb} GB",
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        val ramProgress = (hardwareInfo.availableRamGb / hardwareInfo.totalRamGb.coerceAtLeast(1f)).coerceIn(0f, 1f)
-        LinearProgressIndicator(
-            progress = { ramProgress },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp)),
-            color = if (ramProgress > 0.4f) VipoGreen else VipoAmber,
-            trackColor = MaterialTheme.colorScheme.surfaceContainer
+        MeterRow(
+            label = "Memory",
+            value = "${hardwareInfo.availableRamGb} / ${hardwareInfo.totalRamGb} GB",
+            progress = (hardwareInfo.availableRamGb / hardwareInfo.totalRamGb.coerceAtLeast(1f)).coerceIn(0f, 1f)
         )
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Storage Bar
+        MeterRow(
+            label = "Storage",
+            value = "${hardwareInfo.freeStorageGb} / ${hardwareInfo.totalStorageGb} GB",
+            progress = (hardwareInfo.freeStorageGb / hardwareInfo.totalStorageGb.coerceAtLeast(1f)).coerceIn(0f, 1f)
+        )
+    }
+}
+
+@Composable
+private fun MeterRow(label: String, value: String, progress: Float) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "Storage Available",
-                style = MaterialTheme.typography.bodySmall,
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "${hardwareInfo.freeStorageGb} GB free / ${hardwareInfo.totalStorageGb} GB",
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium,
+                text = value,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        val storageProgress = (hardwareInfo.freeStorageGb / hardwareInfo.totalStorageGb.coerceAtLeast(1f)).coerceIn(0f, 1f)
+        Spacer(modifier = Modifier.height(5.dp))
         LinearProgressIndicator(
-            progress = { storageProgress },
+            progress = { progress },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp)),
-            color = MaterialTheme.colorScheme.secondary,
-            trackColor = MaterialTheme.colorScheme.surfaceContainer
+                .height(3.dp)
+                .clip(RoundedCornerShape(50)),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            trackColor = MaterialTheme.colorScheme.surfaceContainer,
+            gapSize = 0.dp,
+            drawStopIndicator = {}
         )
     }
 }
@@ -181,34 +130,28 @@ fun CompatibilityBadge(
     level: CompatibilityLevel,
     modifier: Modifier = Modifier
 ) {
-    val (color, icon) = when (level) {
-        CompatibilityLevel.EXCELLENT -> VipoGreen to Icons.Default.CheckCircle
-        CompatibilityLevel.GOOD -> VipoGreen to Icons.Default.CheckCircle
-        CompatibilityLevel.USABLE -> VipoAmber to Icons.Default.Info
-        CompatibilityLevel.SLOW -> VipoOrange to Icons.Default.Warning
-        CompatibilityLevel.MEMORY_RISK -> VipoRed to Icons.Default.Warning
+    val color = when (level) {
+        CompatibilityLevel.EXCELLENT, CompatibilityLevel.GOOD -> VipoGreen
+        CompatibilityLevel.USABLE -> VipoAmber
+        CompatibilityLevel.SLOW -> VipoOrange
+        CompatibilityLevel.MEMORY_RISK -> VipoRed
     }
 
     Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(color.copy(alpha = 0.15f))
-            .border(0.5.dp, color.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 8.dp, vertical = 3.dp),
+        modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(12.dp)
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(RoundedCornerShape(50))
+                .background(color)
         )
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = level.label,
-            color = color,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold
+            style = MaterialTheme.typography.labelSmall,
+            color = color
         )
     }
 }

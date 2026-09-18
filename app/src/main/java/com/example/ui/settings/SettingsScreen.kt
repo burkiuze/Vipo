@@ -66,6 +66,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.ModelLogo
 import com.example.ui.theme.VipoCyan
 import com.example.ui.theme.VipoGreen
 
@@ -326,11 +327,16 @@ fun SettingsScreen(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .background(MaterialTheme.colorScheme.surface)
-                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
                             .padding(14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        ModelLogo(
+                            modelName = model.displayName,
+                            architecture = model.architecture,
+                            size = 32.dp
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = model.displayName,
@@ -425,7 +431,7 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { modelToDeletePath = null },
             title = { Text("Delete Model") },
-            text = { Text("Are you sure you want to delete '$modelToDeleteName'? You can re-download it anytime from the Model Hub.") },
+            text = { Text("Are you sure you want to delete '$modelToDeleteName'? You can re-download it anytime from the library.") },
             confirmButton = {
                 Button(
                     onClick = {

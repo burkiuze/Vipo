@@ -11,6 +11,7 @@ import com.example.data.local.SettingsDataStore
 import com.example.data.model.DownloadedModel
 import com.example.data.model.InferenceParams
 import com.example.data.model.PerformanceStats
+import com.example.data.model.PluginRegistry
 import com.example.engine.InferenceEngine
 import com.example.engine.LlamaCppInferenceEngine
 import com.example.engine.LoadResult
@@ -48,7 +49,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getInstance(application)
     val conversationRepository = ConversationRepository(db.conversationDao(), db.chatMessageDao())
-    val modelRepository = ModelRepository(application)
+    val modelRepository = ModelRepository.getInstance(application)
     val settingsDataStore = SettingsDataStore(application)
     val engine: InferenceEngine = LlamaCppInferenceEngine.getInstance()
 
@@ -58,6 +59,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val downloadedModels: StateFlow<List<DownloadedModel>> = modelRepository.downloadedModels
     val showPerformanceSetting: StateFlow<Boolean> = settingsDataStore.showPerformanceStats
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val enabledPluginIds: StateFlow<Set<String>> = settingsDataStore.enabledPluginIds
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PluginRegistry.defaultEnabledIds)
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -223,10 +227,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         activeGenerationJob?.cancel()
         activeGenerationJob = viewModelScope.launch {
             val params = settingsDataStore.inferenceParams.first()
+            val enabledPlugins = settingsDataStore.enabledPluginIds.first()
+            val effectiveSystemPrompt = PluginRegistry.buildSystemPrompt(systemPrompt, enabledPlugins)
             val fullResponseBuilder = StringBuilder()
 
             try {
-                engine.generate(prompt, systemPrompt, params).collect { chunk ->
+                engine.generate(prompt, effectiveSystemPrompt, params).collect { chunk ->
                     if (chunk.token.isNotEmpty()) {
                         fullResponseBuilder.append(chunk.token)
                         _uiState.update {
@@ -328,6 +334,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setSystemPromptDialogVisible(visible: Boolean) {
         _uiState.update { it.copy(showSystemPromptDialog = visible) }
+    }
+
+    /** Called when the chat screen becomes visible again, e.g. after downloading in the library. */
+    fun refreshModels() {
+        viewModelScope.launch { modelRepository.refreshDownloadedModels() }
     }
 
     fun setModelSwitchDialogVisible(visible: Boolean) {

@@ -6,18 +6,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val VipoDarkColorScheme = darkColorScheme(
-    primary = VipoAccent,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFF262840),
-    onPrimaryContainer = Color(0xFFE0E2FE),
-    secondary = VipoCyan,
-    onSecondary = Color(0xFF003544),
-    secondaryContainer = Color(0xFF0C384D),
-    onSecondaryContainer = Color(0xFFBAE6FD),
-    tertiary = VipoGreen,
-    onTertiary = Color(0xFF003822),
-    tertiaryContainer = Color(0xFF0E3D28),
-    onTertiaryContainer = Color(0xFFA7F3D0),
+    primary = VipoInk,
+    onPrimary = Color(0xFF0B0B0C),
+    primaryContainer = VipoSurfaceContainer,
+    onPrimaryContainer = VipoTextPrimary,
+    secondary = VipoTextSecondary,
+    onSecondary = VipoBackground,
+    secondaryContainer = VipoSurfaceVariant,
+    onSecondaryContainer = VipoTextPrimary,
+    tertiary = VipoAccent,
+    onTertiary = Color(0xFF0B0B0C),
+    tertiaryContainer = VipoSurfaceVariant,
+    onTertiaryContainer = VipoTextPrimary,
     background = VipoBackground,
     onBackground = VipoTextPrimary,
     surface = VipoSurface,
@@ -28,7 +28,9 @@ private val VipoDarkColorScheme = darkColorScheme(
     outline = VipoBorder,
     outlineVariant = VipoBorderSubtle,
     error = VipoRed,
-    onError = Color.Black
+    onError = Color(0xFF0B0B0C),
+    errorContainer = Color(0xFF241718),
+    onErrorContainer = VipoRed
 )
 
 @Composable
@@ -38,8 +40,10 @@ fun VipoTheme(
 ) {
     val colorScheme = if (pureBlack) {
         VipoDarkColorScheme.copy(
-            background = Color(0xFF050507),
-            surface = Color(0xFF0C0D11)
+            background = Color(0xFF000000),
+            surface = Color(0xFF0A0A0B),
+            surfaceVariant = Color(0xFF121214),
+            surfaceContainer = Color(0xFF161618)
         )
     } else {
         VipoDarkColorScheme
@@ -48,6 +52,7 @@ fun VipoTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = VipoShapes,
         content = content
     )
 }
