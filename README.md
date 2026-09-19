@@ -24,8 +24,13 @@
 - Model lifecycle management: dynamic loading, clean context unloading, and native memory reclamation.
 - Real-time generation controls: stop mid-generation, regenerate responses, and edit prior queries.
 
-### 2. Large Model Hub (100+ Models & Variants)
-- Extensive catalog covering modern open-weight model architectures:
+### 2. Model Library
+- Every model in the catalog carries its own family mark, so Llama, Qwen, Gemma,
+  Phi, DeepSeek, SmolLM, Mistral, Falcon, StarCoder and StableLM are
+  recognisable at a glance.
+- Tap a row to see the description, compatibility, quantization chips and the
+  download button; downloads resume, pause, retry and can be deleted in place.
+- Catalog covering modern open-weight model architectures:
   - **Llama 3 / 3.1 / 3.2** (1B, 3B, 8B)
   - **Qwen 2.5** (0.5B, 1.5B, 3B, 7B) & Qwen 2.5 Coder
   - **Gemma 2** (2B, 9B)
@@ -49,11 +54,19 @@
 - Automatic recovery of incomplete `.part` downloads on app launch.
 - Import custom `.gguf` files from phone storage or direct download via URL.
 
-### 5. Deep Chat Customization & Performance Stats
+### 5. Plugins
+- Nine on-device behaviour modules (Markdown formatting, Concise answers, Match
+  my language, Coding assistant, Step by step, Summarizer, Explain simply,
+  Follow-up suggestions, No disclaimers).
+- Toggles are stored in DataStore and merged into the system prompt of every
+  generation - no network calls, no extra binaries.
+
+### 6. Deep Chat Customization & Performance Stats
 - Live token-per-second (`t/s`) speed tracking, time-to-first-token, prompt tokens, and context window utilization.
 - Per-conversation system prompt customization.
 - Conversation management: Pinning, renaming, duplicating, searching, and deleting.
-- AMOLED Pure Black theme with subtle dark surface hierarchy.
+- Minimal, flat dark interface: neutral greys, one accent, no decorative
+  borders or glows, with an AMOLED pure-black option.
 
 ---
 
@@ -69,11 +82,12 @@ com.example
 ├── repository       # ConversationRepository, ModelRepository, HardwareRepository
 ├── ui
 │   ├── chat         # ChatScreen, ChatViewModel, InputBar, Bubbles
-│   ├── hub          # ModelHubScreen, ModelHubViewModel, ModelCard, ImportDialog
+│   ├── library      # LibraryScreen, LibraryViewModel, ModelListItem, ImportDialog
+│   ├── plugins      # PluginsScreen, PluginsViewModel
 │   ├── settings     # SettingsScreen, SettingsViewModel
 │   ├── onboarding   # OnboardingScreen (4-page flow)
-│   ├── components   # DeviceSpecsCard, PerformancePanel, NavigationDrawerContent
-│   └── theme        # VipoTheme, Dark palette, Typography
+│   ├── components   # DeviceSpecsCard, PerformancePanel, NavigationDrawerContent, ModelLogo
+│   └── theme        # VipoTheme, minimal palette, typography, shapes
 └── MainActivity.kt  # Compose Navigation Host
 ```
 
@@ -90,15 +104,16 @@ com.example
 ### Build Commands
 ```bash
 # Clone the repository
-git clone https://github.com/vipo-ai/vipo.git
-cd vipo
+git clone https://github.com/burkiuze/Vipo.git
+cd Vipo
 
-# Build debug APK
-./gradlew assembleDebug
-
-# Run unit and Robolectric tests
-./gradlew testDebugUnitTest
+# The repository ships no Gradle wrapper, so use a local Gradle 9.3+
+gradle assembleDebug        # debug APK -> app/build/outputs/apk/debug/
+gradle testDebugUnitTest    # unit and Robolectric tests
 ```
+
+CI (`.github/workflows/build.yml`) runs the same two commands on every push,
+uploads `vipo-debug.apk` as a build artifact and publishes it as a prerelease.
 
 ---
 

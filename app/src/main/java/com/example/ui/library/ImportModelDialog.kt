@@ -1,4 +1,4 @@
-package com.example.ui.hub
+package com.example.ui.library
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer

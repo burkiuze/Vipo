@@ -20,6 +20,19 @@ class ModelRepository(private val context: Context) {
 
     companion object {
         private const val TAG = "ModelRepository"
+
+        @Volatile
+        private var INSTANCE: ModelRepository? = null
+
+        /**
+         * Chat and Library share one repository so a model downloaded in the library shows up in
+         * the chat model picker without restarting the app.
+         */
+        fun getInstance(context: Context): ModelRepository {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: ModelRepository(context.applicationContext).also { INSTANCE = it }
+            }
+        }
     }
 
     private val _catalog = MutableStateFlow<List<ModelCatalogItem>>(emptyList())
@@ -88,6 +101,9 @@ class ModelRepository(private val context: Context) {
     }
 
     suspend fun refreshDownloadedModels(): List<DownloadedModel> = withContext(Dispatchers.IO) {
+        // Downloaded files are matched against the catalog, so it has to be loaded first.
+        if (_catalog.value.isEmpty()) loadCatalog()
+
         val modelsDir = File(context.filesDir, "models")
         if (!modelsDir.exists()) modelsDir.mkdirs()
 
@@ -95,9 +111,15 @@ class ModelRepository(private val context: Context) {
         val list = mutableListOf<DownloadedModel>()
 
         for (file in files) {
+            val catalogMatch = matchCatalogEntry(file.name)
+            val variantName = catalogMatch?.let { id ->
+                file.nameWithoutExtension.removePrefix(id + "_").takeIf { it.isNotBlank() }
+            }
             try {
                 val metadata = GgufParser.parse(file)
-                val displayName = metadata.modelName.ifBlank { file.nameWithoutExtension.replace("_", " ") }
+                val catalogName = catalogMatch?.let { id -> _catalog.value.firstOrNull { it.id == id }?.name }
+                val displayName = catalogName
+                    ?: metadata.modelName.ifBlank { file.nameWithoutExtension.replace("_", " ") }
                 list.add(
                     DownloadedModel(
                         id = file.name,
@@ -106,10 +128,10 @@ class ModelRepository(private val context: Context) {
                         filePath = file.absolutePath,
                         fileSizeBytes = file.length(),
                         formattedSize = DownloadTask.formatBytes(file.length()),
-                        modelId = null,
-                        variantName = null,
+                        modelId = catalogMatch,
+                        variantName = variantName,
                         architecture = metadata.architecture,
-                        isImported = !file.name.contains("_Q")
+                        isImported = catalogMatch == null
                     )
                 )
             } catch (e: Exception) {
@@ -121,15 +143,28 @@ class ModelRepository(private val context: Context) {
                         filePath = file.absolutePath,
                         fileSizeBytes = file.length(),
                         formattedSize = DownloadTask.formatBytes(file.length()),
-                        modelId = null,
-                        variantName = null,
-                        architecture = "unknown"
+                        modelId = catalogMatch,
+                        variantName = variantName,
+                        architecture = "unknown",
+                        isImported = catalogMatch == null
                     )
                 )
             }
         }
         _downloadedModels.value = list
         list
+    }
+
+    /**
+     * Downloads are stored as "<catalogId>_<variant>.gguf", so the longest catalog id the file name
+     * starts with identifies the catalog entry. Imported or custom files match nothing.
+     */
+    private fun matchCatalogEntry(fileName: String): String? {
+        val base = fileName.removeSuffix(".gguf")
+        return _catalog.value
+            .map { it.id }
+            .filter { base == it || base.startsWith(it + "_") }
+            .maxByOrNull { it.length }
     }
 
     suspend fun deleteModel(filePath: String): Boolean = withContext(Dispatchers.IO) {

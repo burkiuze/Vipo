@@ -13,6 +13,11 @@ android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
+  // CI passes the NDK that is already installed on the runner so nothing has to be downloaded.
+  (project.findProperty("vipo.ndkVersion") as String?)?.takeIf { it.isNotBlank() }?.let {
+    ndkVersion = it
+  }
+
   defaultConfig {
     applicationId = "com.aistudio.vipo.offline"
     minSdk = 24
@@ -21,21 +26,47 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    // llama.cpp is built from source for 64-bit ARM, which is what every phone that can
+    // realistically run a local model uses. Other ABIs fall back to "no engine available".
+    ndk { abiFilters += listOf("arm64-v8a") }
+
+    externalNativeBuild {
+      cmake {
+        arguments += listOf("-DANDROID_STL=c++_static", "-DCMAKE_BUILD_TYPE=Release")
+        cppFlags += "-O3"
+      }
+    }
   }
 
-  signingConfigs {
-    create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+  externalNativeBuild {
+    cmake {
+      path = file("src/main/cpp/CMakeLists.txt")
+      version = "3.31.6"
     }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
+  }
+
+  // Keystores are not checked in, so only wire them up when they are actually present -
+  // otherwise the build falls back to the auto-generated debug keystore (e.g. on CI).
+  val releaseKeystore = file(System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks")
+  val debugKeystore = file("${rootDir}/debug.keystore")
+
+  signingConfigs {
+    if (releaseKeystore.exists()) {
+      create("release") {
+        storeFile = releaseKeystore
+        storePassword = System.getenv("STORE_PASSWORD")
+        keyAlias = "upload"
+        keyPassword = System.getenv("KEY_PASSWORD")
+      }
+    }
+    if (debugKeystore.exists()) {
+      create("debugConfig") {
+        storeFile = debugKeystore
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
+      }
     }
   }
 
@@ -44,9 +75,11 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    debug {
+      signingConfig = signingConfigs.findByName("debugConfig") ?: signingConfigs.getByName("debug")
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11

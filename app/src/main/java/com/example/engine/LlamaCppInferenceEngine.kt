@@ -6,16 +6,22 @@ import com.example.data.model.GenerationChunk
 import com.example.data.model.GgufMetadata
 import com.example.data.model.InferenceParams
 import com.example.data.model.PerformanceStats
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
+/**
+ * Runs GGUF models with llama.cpp through [LlamaNative]. Everything happens on the device; there
+ * is no remote fallback, so when the native library is unavailable loading simply fails.
+ */
 class LlamaCppInferenceEngine : InferenceEngine {
 
     companion object {
@@ -26,289 +32,231 @@ class LlamaCppInferenceEngine : InferenceEngine {
 
         fun getInstance(): LlamaCppInferenceEngine {
             return INSTANCE ?: synchronized(this) {
-                val instance = LlamaCppInferenceEngine()
-                INSTANCE = instance
-                instance
+                INSTANCE ?: LlamaCppInferenceEngine().also { INSTANCE = it }
             }
         }
     }
 
-    private var nativeModelHandle: Long = 0L
+    // llama.cpp contexts are not thread safe: keep every native call on one thread.
+    private val nativeDispatcher = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "vipo-llama").apply { isDaemon = true }
+    }.asCoroutineDispatcher()
+
+    private val generationLock = Mutex()
+
+    private var handle: Long = 0L
     private var currentMetadata: GgufMetadata? = null
+    private var modelLoadTimeMs: Long = 0L
+    private var lastPerformanceStats = PerformanceStats()
+
     override var activeModelPath: String? = null
         private set
     override var activeModelName: String? = null
         private set
+
     override val isLoaded: Boolean
-        get() = activeModelPath != null && (nativeModelHandle != 0L || currentMetadata != null)
+        get() = handle != 0L
+
+    override val isNativeAvailable: Boolean
+        get() = LlamaNative.isAvailable()
 
     private val isStopRequested = AtomicBoolean(false)
-    private var lastPerformanceStats = PerformanceStats()
-    private var modelLoadTimeMs: Long = 0L
 
     override suspend fun loadModel(
         modelPath: String,
         displayName: String?,
         params: InferenceParams
-    ): LoadResult = withContext(Dispatchers.IO) {
-        val startTime = SystemClock.elapsedRealtime()
-        try {
-            val file = File(modelPath)
-            if (!file.exists()) {
-                return@withContext LoadResult.Error("Model file does not exist at: $modelPath")
-            }
-
-            // Stop ongoing generation and free previous model first
-            unloadModel()
-
-            Log.i(TAG, "Loading GGUF model: ${file.name} (${file.length() / (1024 * 1024)} MB)")
-
-            // Parse GGUF header & metadata
-            val metadata = GgufParser.parse(file)
-            currentMetadata = metadata
-            activeModelPath = modelPath
-            activeModelName = displayName ?: metadata.modelName.ifBlank { file.nameWithoutExtension }
-
-            // If native llama.cpp JNI is available, load via native library
-            if (LlamaNative.isAvailable()) {
-                try {
-                    nativeModelHandle = LlamaNative.nativeLoadModel(
-                        path = modelPath,
-                        nCtx = params.contextSize,
-                        nThreads = params.threads,
-                        nGpuLayers = 0
-                    )
-                    Log.i(TAG, "Native model loaded with handle: $nativeModelHandle")
-                } catch (t: Throwable) {
-                    Log.w(TAG, "Native load failed: ${t.message}. Operating in built-in local inference mode.")
-                }
-            }
-
-            modelLoadTimeMs = SystemClock.elapsedRealtime() - startTime
-            val ramEstimateMb = ((file.length() / (1024 * 1024)) * 1.25).toInt()
-
-            lastPerformanceStats = PerformanceStats(
-                modelLoadTimeMs = modelLoadTimeMs,
-                contextMaxTokens = params.contextSize,
-                ramEstimateMb = ramEstimateMb
-            )
-
-            Log.i(TAG, "Model loaded in ${modelLoadTimeMs}ms: $activeModelName")
-            return@withContext LoadResult.Success(metadata, modelLoadTimeMs)
-        } catch (oom: OutOfMemoryError) {
-            Log.e(TAG, "Out of memory while loading model: ${oom.message}", oom)
-            unloadModel()
-            return@withContext LoadResult.Error("Out of memory: The selected model is too large for current available device RAM.", oom)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load model: ${e.message}", e)
-            unloadModel()
-            return@withContext LoadResult.Error(e.message ?: "Failed to load model", e)
+    ): LoadResult = withContext(nativeDispatcher) {
+        val file = File(modelPath)
+        if (!file.exists()) {
+            return@withContext LoadResult.Error("Model file not found: $modelPath")
         }
+        if (!LlamaNative.isAvailable()) {
+            return@withContext LoadResult.Error(
+                "The llama.cpp library is not available for this device's CPU architecture."
+            )
+        }
+
+        unloadModelInternal()
+
+        val start = SystemClock.elapsedRealtime()
+        LlamaNative.ensureInitialised()
+
+        val fileMetadata = try {
+            GgufParser.parse(file)
+        } catch (e: Exception) {
+            Log.w(TAG, "GGUF header could not be parsed: ${e.message}")
+            GgufMetadata(modelName = file.nameWithoutExtension, fileSizeBytes = file.length())
+        }
+
+        val newHandle = try {
+            LlamaNative.nativeLoadModel(
+                path = modelPath,
+                nCtx = params.contextSize,
+                nThreads = params.threads,
+                nGpuLayers = 0
+            )
+        } catch (t: Throwable) {
+            Log.e(TAG, "native load failed: ${t.message}", t)
+            0L
+        }
+
+        if (newHandle == 0L) {
+            return@withContext LoadResult.Error(
+                "${file.name} could not be loaded. The file may be incomplete, or the device may not have enough free memory."
+            )
+        }
+
+        handle = newHandle
+        modelLoadTimeMs = SystemClock.elapsedRealtime() - start
+        activeModelPath = modelPath
+        activeModelName = displayName ?: fileMetadata.modelName.ifBlank { file.nameWithoutExtension }
+
+        val contextSize = LlamaNative.nativeContextSize(newHandle)
+        val architecture = LlamaNative.nativeModelMeta(newHandle, "general.architecture")
+            .ifBlank { fileMetadata.architecture }
+
+        val metadata = fileMetadata.copy(
+            architecture = architecture,
+            contextLength = if (contextSize > 0) contextSize else fileMetadata.contextLength,
+            fileSizeBytes = file.length()
+        )
+        currentMetadata = metadata
+
+        lastPerformanceStats = PerformanceStats(
+            contextMaxTokens = if (contextSize > 0) contextSize else params.contextSize,
+            modelLoadTimeMs = modelLoadTimeMs,
+            ramEstimateMb = (file.length() / (1024 * 1024)).toInt()
+        )
+
+        Log.i(TAG, "loaded ${file.name} in ${modelLoadTimeMs}ms (ctx=$contextSize)")
+        LoadResult.Success(metadata, modelLoadTimeMs)
     }
 
-    override suspend fun unloadModel(): Unit = withContext(Dispatchers.IO) {
-        stopGeneration()
+    override suspend fun unloadModel() = withContext(nativeDispatcher) {
+        unloadModelInternal()
+    }
 
-        if (nativeModelHandle != 0L && LlamaNative.isAvailable()) {
+    private fun unloadModelInternal() {
+        isStopRequested.set(true)
+        if (handle != 0L) {
             try {
-                LlamaNative.nativeUnloadModel(nativeModelHandle)
+                LlamaNative.nativeFreeModel(handle)
             } catch (t: Throwable) {
-                Log.e(TAG, "Error freeing native model handle: ${t.message}")
+                Log.e(TAG, "native free failed: ${t.message}")
             }
-            nativeModelHandle = 0L
+            handle = 0L
         }
-
         currentMetadata = null
         activeModelPath = null
         activeModelName = null
-
-        // Trigger memory cleanup
-        System.gc()
-        Log.i(TAG, "Model unloaded and memory freed.")
-        Unit
     }
+
+    /** True when the loaded model's chat template produces a reasoning block. */
+    fun supportsThinking(): Boolean =
+        handle != 0L && runCatching { LlamaNative.nativeSupportsThinking(handle) }.getOrDefault(false)
+
+    override fun generate(
+        messages: List<ChatTurn>,
+        systemPrompt: String?,
+        params: InferenceParams
+    ): Flow<GenerationChunk> = flow {
+        if (handle == 0L) {
+            emit(
+                GenerationChunk(
+                    token = "No model is loaded. Open the library and download a model first.",
+                    isFinished = true
+                )
+            )
+            return@flow
+        }
+
+        generationLock.withLock {
+            isStopRequested.set(false)
+            val startTime = SystemClock.elapsedRealtime()
+
+            val turns = buildList {
+                if (!systemPrompt.isNullOrBlank()) {
+                    add(ChatTurn(ChatTurn.ROLE_SYSTEM, systemPrompt.trim()))
+                }
+                addAll(messages)
+            }
+
+            val startCode = LlamaNative.nativeStartCompletion(
+                handle = handle,
+                roles = turns.map { it.role }.toTypedArray(),
+                contents = turns.map { it.content }.toTypedArray(),
+                temperature = params.temperature,
+                topP = params.topP,
+                topK = params.topK,
+                minP = params.minP,
+                repeatPenalty = params.repeatPenalty,
+                seed = params.seed,
+                nPredict = maxOf(64, params.contextSize / 2)
+            )
+
+            if (startCode != 0) {
+                emit(
+                    GenerationChunk(
+                        token = "The prompt could not be processed (error $startCode).",
+                        isFinished = true,
+                        stats = lastPerformanceStats
+                    )
+                )
+                return@withLock
+            }
+
+            val promptTokens = LlamaNative.nativePromptTokens(handle)
+            val contextMax = LlamaNative.nativeContextSize(handle).takeIf { it > 0 } ?: params.contextSize
+            var timeToFirstTokenMs = 0L
+            var generated = 0
+
+            while (true) {
+                if (isStopRequested.get()) {
+                    LlamaNative.nativeStopCompletion(handle)
+                    break
+                }
+
+                val piece = LlamaNative.nativeNextToken(handle) ?: break
+                if (piece.isEmpty()) continue
+
+                generated++
+                if (timeToFirstTokenMs == 0L) {
+                    timeToFirstTokenMs = SystemClock.elapsedRealtime() - startTime
+                }
+
+                val elapsedSec = (SystemClock.elapsedRealtime() - startTime) / 1000f
+                val tokensPerSecond = if (elapsedSec > 0.05f) generated / elapsedSec else 0f
+                val usedTokens = promptTokens + generated
+
+                val stats = PerformanceStats(
+                    tokensPerSecond = (tokensPerSecond * 10).toInt() / 10f,
+                    timeToFirstTokenMs = timeToFirstTokenMs,
+                    promptTokens = promptTokens,
+                    generatedTokens = generated,
+                    contextUsagePercentage = ((usedTokens.toFloat() / contextMax) * 1000).toInt() / 10f,
+                    contextUsedTokens = usedTokens,
+                    contextMaxTokens = contextMax,
+                    modelLoadTimeMs = modelLoadTimeMs,
+                    ramEstimateMb = lastPerformanceStats.ramEstimateMb
+                )
+                lastPerformanceStats = stats
+
+                emit(GenerationChunk(token = piece, isFinished = false, stats = stats))
+            }
+
+            emit(GenerationChunk(token = "", isFinished = true, stats = lastPerformanceStats))
+        }
+    }.flowOn(nativeDispatcher)
 
     override fun stopGeneration() {
         isStopRequested.set(true)
+        if (handle != 0L) {
+            runCatching { LlamaNative.nativeStopCompletion(handle) }
+        }
     }
 
     override fun getMetadata(): GgufMetadata? = currentMetadata
 
     override fun getPerformanceStats(): PerformanceStats = lastPerformanceStats
-
-    override fun generate(
-        prompt: String,
-        systemPrompt: String?,
-        params: InferenceParams
-    ): Flow<GenerationChunk> = flow {
-        isStopRequested.set(false)
-        val startTime = SystemClock.elapsedRealtime()
-
-        if (!isLoaded) {
-            emit(GenerationChunk(token = "Error: No local GGUF model is loaded. Please select or download a model from Model Hub.", isFinished = true))
-            return@flow
-        }
-
-        val formattedPrompt = formatChatPrompt(prompt, systemPrompt, currentMetadata?.architecture)
-        val promptTokensEst = (formattedPrompt.length / 3.8).toInt().coerceAtLeast(1)
-
-        var timeToFirstTokenMs = 0L
-        var generatedTokens = 0
-
-        // If native JNI is available and handle is valid
-        if (LlamaNative.isAvailable() && nativeModelHandle != 0L) {
-            var contextHandle = 0L
-            try {
-                contextHandle = LlamaNative.nativeInitContext(
-                    nativeModelHandle,
-                    formattedPrompt,
-                    params.temperature,
-                    params.topP
-                )
-
-                while (!isStopRequested.get()) {
-                    val token = LlamaNative.nativeSampleNextToken(contextHandle)
-                    if (token == null || token == "<|im_end|>" || token == "<|end_of_text|>" || token == "</s>") {
-                        break
-                    }
-                    if (timeToFirstTokenMs == 0L) {
-                        timeToFirstTokenMs = SystemClock.elapsedRealtime() - startTime
-                    }
-                    generatedTokens++
-
-                    val elapsedSec = (SystemClock.elapsedRealtime() - startTime) / 1000.0f
-                    val tokensPerSec = if (elapsedSec > 0.05f) generatedTokens / elapsedSec else 0f
-                    val totalTokens = promptTokensEst + generatedTokens
-                    val contextPct = (totalTokens.toFloat() / params.contextSize.toFloat()) * 100f
-
-                    val stats = PerformanceStats(
-                        tokensPerSecond = tokensPerSec,
-                        timeToFirstTokenMs = timeToFirstTokenMs,
-                        promptTokens = promptTokensEst,
-                        generatedTokens = generatedTokens,
-                        contextUsagePercentage = contextPct.coerceIn(0f, 100f),
-                        contextUsedTokens = totalTokens,
-                        contextMaxTokens = params.contextSize,
-                        modelLoadTimeMs = modelLoadTimeMs,
-                        ramEstimateMb = lastPerformanceStats.ramEstimateMb
-                    )
-                    lastPerformanceStats = stats
-                    emit(GenerationChunk(token = token, isFinished = false, stats = stats))
-                }
-            } catch (t: Throwable) {
-                Log.e(TAG, "Native generation error: ${t.message}")
-            } finally {
-                if (contextHandle != 0L) {
-                    try {
-                        LlamaNative.nativeFreeContext(contextHandle)
-                    } catch (_: Exception) {}
-                }
-            }
-        } else {
-            // High-fidelity local token-by-token streaming inference
-            val responseTokens = synthesizeLocalInferenceTokens(prompt, systemPrompt, currentMetadata)
-
-            for (token in responseTokens) {
-                if (isStopRequested.get()) break
-
-                if (timeToFirstTokenMs == 0L) {
-                    timeToFirstTokenMs = SystemClock.elapsedRealtime() - startTime
-                }
-                generatedTokens++
-
-                // Realistic edge token streaming interval (35-70ms per token)
-                val delayTime = (45L + (params.temperature * 15L).toLong()).coerceIn(25L, 100L)
-                delay(delayTime)
-
-                val elapsedSec = (SystemClock.elapsedRealtime() - startTime) / 1000.0f
-                val tokensPerSec = if (elapsedSec > 0.05f) generatedTokens / elapsedSec else 16.5f
-                val totalTokens = promptTokensEst + generatedTokens
-                val contextPct = (totalTokens.toFloat() / params.contextSize.toFloat()) * 100f
-
-                val stats = PerformanceStats(
-                    tokensPerSecond = (tokensPerSec * 10).toInt() / 10f,
-                    timeToFirstTokenMs = timeToFirstTokenMs,
-                    promptTokens = promptTokensEst,
-                    generatedTokens = generatedTokens,
-                    contextUsagePercentage = (contextPct * 10).toInt() / 10f,
-                    contextUsedTokens = totalTokens,
-                    contextMaxTokens = params.contextSize,
-                    modelLoadTimeMs = modelLoadTimeMs,
-                    ramEstimateMb = lastPerformanceStats.ramEstimateMb
-                )
-                lastPerformanceStats = stats
-                emit(GenerationChunk(token = token, isFinished = false, stats = stats))
-            }
-        }
-
-        // Final completion chunk
-        emit(GenerationChunk(token = "", isFinished = true, stats = lastPerformanceStats))
-    }.flowOn(Dispatchers.Default)
-
-    private fun formatChatPrompt(prompt: String, systemPrompt: String?, architecture: String?): String {
-        val sys = systemPrompt ?: "You are Vipo, a private AI running completely offline on this device."
-        return when (architecture?.lowercase()) {
-            "qwen2", "qwen" -> {
-                "<|im_start|>system\n$sys<|im_end|>\n<|im_start|>user\n$prompt<|im_end|>\n<|im_start|>assistant\n"
-            }
-            "llama" -> {
-                "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n$sys<|eot_id|>" +
-                        "<|start_header_id|>user<|end_header_id|>\n\n$prompt<|eot_id|>" +
-                        "<|start_header_id|>assistant<|end_header_id|>\n\n"
-            }
-            "gemma", "gemma2" -> {
-                "<start_of_turn>user\n$sys\n\n$prompt<end_of_turn>\n<start_of_turn>model\n"
-            }
-            "phi3", "phi" -> {
-                "<|system|>\n$sys<|end|>\n<|user|>\n$prompt<|end|>\n<|assistant|>\n"
-            }
-            else -> {
-                "### System:\n$sys\n\n### User:\n$prompt\n\n### Assistant:\n"
-            }
-        }
-    }
-
-    private fun synthesizeLocalInferenceTokens(
-        prompt: String,
-        systemPrompt: String?,
-        metadata: GgufMetadata?
-    ): List<String> {
-        val cleanPrompt = prompt.trim()
-        val lower = cleanPrompt.lowercase()
-        val arch = metadata?.architecture ?: "GGUF"
-        val modelName = activeModelName ?: "Local Model"
-
-        val responseText = when {
-            lower.contains("who are you") || lower.contains("what is vipo") -> {
-                "I am running locally on your device using the **$modelName** ($arch architecture). Everything stays completely on your phone with zero data sent anywhere."
-            }
-            lower.contains("offline") || lower.contains("privacy") || lower.contains("internet") -> {
-                "Vipo operates 100% offline. You can turn on Airplane mode or disable Wi-Fi and mobile data at any time—your models, chats, and weights run purely on local hardware."
-            }
-            lower.contains("model") && (lower.contains("info") || lower.contains("architecture") || lower.contains("spec")) -> {
-                "Current Active Model:\n- **Name:** $modelName\n- **Architecture:** $arch\n- **Context Window:** ${metadata?.contextLength ?: 2048} tokens\n- **Tensors:** ${metadata?.tensorCount ?: "N/A"}\n- **Quantization:** v${metadata?.quantizationVersion ?: 2}\n- **Inference Mode:** On-device CPU/NEON threads"
-            }
-            lower.contains("code") || lower.contains("kotlin") || lower.contains("python") || lower.contains("function") -> {
-                "Here is a clean implementation running directly on your phone:\n\n```kotlin\n// Local on-device execution\nfun processLocalQuery(input: String): String {\n    val words = input.split(\" \")\n    return \"Processed \" + words.size + \" tokens locally.\"\n}\n```\n\nThis runs without requiring network connectivity or external servers."
-            }
-            lower.startsWith("write") || lower.contains("poem") || lower.contains("story") -> {
-                "In quiet silicon the numbers speak,\nNo distant server or connection weak.\nWithin your palm the weights align and flow,\nA private intelligence that continues to grow.\nBound by no cloud, tethered to no wire,\nOn local hardware burns the digital fire."
-            }
-            else -> {
-                "Processing your query with **$modelName**:\n\nRegarding \"$cleanPrompt\":\n\nRunning models locally offers true privacy, deterministic latency, and independence from cloud service availability. Because this model is stored entirely on your internal storage, all inference is computed on your device's CPU and memory."
-            }
-        }
-
-        // Split text into realistic word/sub-word tokens
-        val tokens = mutableListOf<String>()
-        val regex = Regex("(\\s+|[a-zA-Z0-9_]+|[^\\s\\w])")
-        val matches = regex.findAll(responseText)
-        for (m in matches) {
-            tokens.add(m.value)
-        }
-        if (tokens.isEmpty()) {
-            tokens.add(responseText)
-        }
-        return tokens
-    }
 }

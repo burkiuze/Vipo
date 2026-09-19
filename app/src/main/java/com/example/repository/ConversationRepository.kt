@@ -13,6 +13,11 @@ class ConversationRepository(
 ) {
     val conversations: Flow<List<ConversationEntity>> = conversationDao.getAllConversations()
 
+    /** One-shot read of a conversation's messages, used to build the model prompt. */
+    suspend fun getMessagesOnce(conversationId: String): List<ChatMessageEntity> {
+        return chatMessageDao.getMessagesSnapshot(conversationId)
+    }
+
     fun getMessages(conversationId: String): Flow<List<ChatMessageEntity>> {
         return chatMessageDao.getMessagesForConversation(conversationId)
     }

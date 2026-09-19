@@ -9,8 +9,10 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.data.model.InferenceParams
+import com.example.data.model.PluginRegistry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -26,6 +28,7 @@ class SettingsDataStore(private val context: Context) {
         val KEY_AUTO_LOAD_LAST_MODEL = booleanPreferencesKey("auto_load_last_model")
         val KEY_SHOW_PERFORMANCE_STATS = booleanPreferencesKey("show_performance_stats")
         val KEY_PURE_BLACK_THEME = booleanPreferencesKey("pure_black_theme")
+        val KEY_ENABLED_PLUGINS = stringSetPreferencesKey("enabled_plugins")
 
         // Inference Params
         val KEY_CONTEXT_SIZE = intPreferencesKey("context_size")
@@ -61,6 +64,10 @@ class SettingsDataStore(private val context: Context) {
 
     val pureBlackTheme: Flow<Boolean> = context.dataStore.data.map {
         it[KEY_PURE_BLACK_THEME] ?: true
+    }
+
+    val enabledPluginIds: Flow<Set<String>> = context.dataStore.data.map {
+        it[KEY_ENABLED_PLUGINS] ?: PluginRegistry.defaultEnabledIds
     }
 
     val autoLoadLastModel: Flow<Boolean> = context.dataStore.data.map {
@@ -100,6 +107,17 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setPureBlackTheme(pureBlack: Boolean) {
         context.dataStore.edit { it[KEY_PURE_BLACK_THEME] = pureBlack }
+    }
+
+    suspend fun setPluginEnabled(pluginId: String, enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[KEY_ENABLED_PLUGINS] ?: PluginRegistry.defaultEnabledIds
+            prefs[KEY_ENABLED_PLUGINS] = if (enabled) current + pluginId else current - pluginId
+        }
+    }
+
+    suspend fun setEnabledPlugins(ids: Set<String>) {
+        context.dataStore.edit { it[KEY_ENABLED_PLUGINS] = ids }
     }
 
     suspend fun setAutoLoadLastModel(autoLoad: Boolean) {

@@ -1,7 +1,7 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,20 +16,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -53,25 +51,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.local.ConversationEntity
-import com.example.ui.theme.VipoCyan
-import com.example.ui.theme.VipoGreen
 
 @Composable
 fun NavigationDrawerContent(
     conversations: List<ConversationEntity>,
     activeConversationId: String?,
+    activePluginCount: Int,
     onSelectConversation: (String) -> Unit,
     onNewChat: () -> Unit,
     onRenameConversation: (String, String) -> Unit,
     onDeleteConversation: (String) -> Unit,
     onTogglePin: (String, Boolean) -> Unit,
     onDuplicateConversation: (String) -> Unit,
-    onNavigateToHub: () -> Unit,
+    onNavigateToLibrary: () -> Unit,
+    onNavigateToPlugins: () -> Unit,
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -90,97 +90,91 @@ fun NavigationDrawerContent(
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .width(320.dp)
+            .width(310.dp)
             .background(MaterialTheme.colorScheme.surface)
-            .padding(vertical = 16.dp, horizontal = 12.dp)
+            .padding(horizontal = 14.dp, vertical = 20.dp)
     ) {
-        // App Header
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 6.dp)
         ) {
-            Box(
+            Image(
+                painter = painterResource(R.drawable.vipo_logo_1789758758147),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("V", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 18.sp)
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-            Column {
-                Text(
-                    text = "Vipo",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "100% Offline Local AI",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = VipoGreen
-                )
-            }
+                    .size(26.dp)
+                    .clip(MaterialTheme.shapes.extraSmall)
+            )
+            Spacer(modifier = Modifier.width(9.dp))
+            Text(
+                text = "Vipo",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // New Chat Button
+        // Primary actions: New chat, Library, Plugins.
         Button(
             onClick = onNewChat,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(46.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                .height(48.dp),
+            shape = RoundedCornerShape(50),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
         ) {
-            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(17.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("New Conversation", fontWeight = FontWeight.SemiBold)
+            Text("New chat", style = MaterialTheme.typography.labelLarge)
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // Search Input
+        DrawerAction(
+            icon = Icons.AutoMirrored.Filled.LibraryBooks,
+            label = "Library",
+            hint = "Browse and download models",
+            onClick = onNavigateToLibrary
+        )
+        DrawerAction(
+            icon = Icons.Default.Extension,
+            label = "Plugins",
+            hint = if (activePluginCount > 0) "$activePluginCount active" else "None active",
+            onClick = onNavigateToPlugins
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search conversations...", fontSize = 13.sp) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+            placeholder = { Text("Search chats", style = MaterialTheme.typography.bodySmall) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(17.dp)) },
             singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.small,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                focusedBorderColor = MaterialTheme.colorScheme.outline,
+                unfocusedBorderColor = Color.Transparent
             )
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Conversations List
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
         ) {
             if (pinnedChats.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "PINNED",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
-                    )
-                }
+                item { SectionLabel("Pinned") }
                 items(pinnedChats, key = { it.id }) { conv ->
                     ConversationItemRow(
                         conversation = conv,
@@ -198,15 +192,7 @@ fun NavigationDrawerContent(
             }
 
             if (recentChats.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "RECENT CHATS",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
-                    )
-                }
+                item { SectionLabel("Recent") }
                 items(recentChats, key = { it.id }) { conv ->
                     ConversationItemRow(
                         conversation = conv,
@@ -243,62 +229,22 @@ fun NavigationDrawerContent(
 
         HorizontalDivider(
             color = MaterialTheme.colorScheme.outlineVariant,
-            modifier = Modifier.padding(vertical = 8.dp)
+            modifier = Modifier.padding(vertical = 6.dp)
         )
 
-        // Bottom Navigation Rows
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .clickable { onNavigateToHub() }
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.Hub,
-                contentDescription = "Model Hub",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "Model Hub",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .clickable { onNavigateToSettings() }
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.Settings,
-                contentDescription = "Settings",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "Settings",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
+        DrawerAction(
+            icon = Icons.Default.Settings,
+            label = "Settings",
+            hint = null,
+            onClick = onNavigateToSettings
+        )
     }
 
-    // Rename Dialog
     if (renameTargetId != null) {
         AlertDialog(
             onDismissRequest = { renameTargetId = null },
-            title = { Text("Rename Chat") },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Rename chat") },
             text = {
                 OutlinedTextField(
                     value = renameText,
@@ -308,9 +254,9 @@ fun NavigationDrawerContent(
                 )
             },
             confirmButton = {
-                Button(
+                TextButton(
                     onClick = {
-                        val id = renameTargetId ?: return@Button
+                        val id = renameTargetId ?: return@TextButton
                         if (renameText.isNotBlank()) {
                             onRenameConversation(id, renameText.trim())
                         }
@@ -321,11 +267,57 @@ fun NavigationDrawerContent(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { renameTargetId = null }) {
-                    Text("Cancel")
-                }
+                TextButton(onClick = { renameTargetId = null }) { Text("Cancel") }
             }
         )
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+    )
+}
+
+@Composable
+private fun DrawerAction(
+    icon: ImageVector,
+    label: String,
+    hint: String?,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.small)
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        if (hint != null) {
+            Text(
+                text = hint,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -344,13 +336,12 @@ fun ConversationItemRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(MaterialTheme.shapes.small)
             .background(
-                if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                else Color.Transparent
+                if (isSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent
             )
             .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 10.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -361,30 +352,26 @@ fun ConversationItemRow(
             Icon(
                 imageVector = if (conversation.isPinned) Icons.Default.PushPin else Icons.Default.ChatBubbleOutline,
                 contentDescription = null,
-                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(15.dp)
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
                 text = conversation.title,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
 
         Box {
-            IconButton(
-                onClick = { menuExpanded = true },
-                modifier = Modifier.size(24.dp)
-            ) {
+            IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(24.dp)) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Options",
+                    contentDescription = "Chat options",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(15.dp)
                 )
             }
 
@@ -403,7 +390,7 @@ fun ConversationItemRow(
                 )
                 DropdownMenuItem(
                     text = { Text(if (conversation.isPinned) "Unpin" else "Pin") },
-                    leadingIcon = { Icon(Icons.Default.Pin, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null, modifier = Modifier.size(16.dp)) },
                     onClick = {
                         menuExpanded = false
                         onTogglePin()
@@ -420,7 +407,14 @@ fun ConversationItemRow(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 DropdownMenuItem(
                     text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp)) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
                     onClick = {
                         menuExpanded = false
                         onDelete()

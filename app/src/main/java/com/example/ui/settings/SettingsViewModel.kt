@@ -33,7 +33,7 @@ data class SettingsUiState(
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val settingsDataStore = SettingsDataStore(application)
-    private val modelRepository = ModelRepository(application)
+    private val modelRepository = ModelRepository.getInstance(application)
     private val hardwareRepository = HardwareRepository(application)
     val engine: InferenceEngine = LlamaCppInferenceEngine.getInstance()
 

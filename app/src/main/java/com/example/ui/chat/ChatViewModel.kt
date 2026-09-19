@@ -11,6 +11,9 @@ import com.example.data.local.SettingsDataStore
 import com.example.data.model.DownloadedModel
 import com.example.data.model.InferenceParams
 import com.example.data.model.PerformanceStats
+import com.example.data.model.PluginRegistry
+import com.example.data.model.ReasoningText
+import com.example.engine.ChatTurn
 import com.example.engine.InferenceEngine
 import com.example.engine.LlamaCppInferenceEngine
 import com.example.engine.LoadResult
@@ -48,7 +51,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getInstance(application)
     val conversationRepository = ConversationRepository(db.conversationDao(), db.chatMessageDao())
-    val modelRepository = ModelRepository(application)
+    val modelRepository = ModelRepository.getInstance(application)
     val settingsDataStore = SettingsDataStore(application)
     val engine: InferenceEngine = LlamaCppInferenceEngine.getInstance()
 
@@ -59,10 +62,22 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val showPerformanceSetting: StateFlow<Boolean> = settingsDataStore.showPerformanceStats
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    val enabledPluginIds: StateFlow<Set<String>> = settingsDataStore.enabledPluginIds
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PluginRegistry.defaultEnabledIds)
+
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     private var activeGenerationJob: Job? = null
+
+    /** Collector for the selected conversation's messages; replaced whenever the chat changes. */
+    private var messagesJob: Job? = null
+
+    private companion object {
+        /** Older turns are dropped so the prompt keeps fitting into small mobile contexts. */
+        const val MAX_HISTORY_MESSAGES = 20
+        const val DEFAULT_CHAT_TITLE = "New chat"
+    }
 
     init {
         viewModelScope.launch {
@@ -93,12 +108,27 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectConversation(conversationId: String) {
-        viewModelScope.launch {
+        // Without this, every switch left an old collector running and the two fought over
+        // uiState.messages, so messages from another chat could appear in this one.
+        messagesJob?.cancel()
+        messagesJob = viewModelScope.launch {
             val conv = conversationRepository.getConversationById(conversationId) ?: return@launch
-            _uiState.update { it.copy(currentConversation = conv, systemPromptDraft = conv.systemPrompt) }
+            _uiState.update {
+                it.copy(
+                    currentConversation = conv,
+                    systemPromptDraft = conv.systemPrompt,
+                    messages = emptyList()
+                )
+            }
 
             conversationRepository.getMessages(conversationId).collect { msgList ->
-                _uiState.update { it.copy(messages = msgList) }
+                _uiState.update { state ->
+                    if (state.currentConversation?.id == conversationId) {
+                        state.copy(messages = msgList)
+                    } else {
+                        state
+                    }
+                }
             }
         }
     }
@@ -108,7 +138,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val modelName = engine.activeModelName ?: "Default"
             val modelPath = engine.activeModelPath ?: ""
             val conv = conversationRepository.createConversation(
-                title = "New Chat",
+                title = DEFAULT_CHAT_TITLE,
                 modelUsed = modelName,
                 modelPath = modelPath
             )
@@ -168,7 +198,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 content = text
             )
 
-            executeInference(conv.id, text, conv.systemPrompt)
+            // Name the chat after its first message instead of leaving it as "New chat".
+            if (conv.title.isBlank() || conv.title == DEFAULT_CHAT_TITLE) {
+                val title = text.lineSequence().first().trim().take(40).ifBlank { DEFAULT_CHAT_TITLE }
+                conversationRepository.renameConversation(conv.id, title)
+                _uiState.update { it.copy(currentConversation = it.currentConversation?.copy(title = title)) }
+            }
+
+            executeInference(conv.id, conv.systemPrompt)
         }
     }
 
@@ -184,7 +221,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             conversationRepository.deleteMessagesFrom(conv.id, lastUserMsg.timestamp + 1)
             _uiState.update { it.copy(isGenerating = true, streamingContent = "") }
 
-            executeInference(conv.id, lastUserMsg.content, conv.systemPrompt)
+            executeInference(conv.id, conv.systemPrompt)
         }
     }
 
@@ -215,18 +252,37 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
             // Delete subsequent messages and generate anew
             conversationRepository.deleteMessagesFrom(conv.id, targetMsg.timestamp + 1)
-            executeInference(conv.id, newText, conv.systemPrompt)
+            executeInference(conv.id, conv.systemPrompt)
         }
     }
 
-    private fun executeInference(conversationId: String, prompt: String, systemPrompt: String) {
+    /**
+     * Sends the whole conversation to the model. The stored messages are the source of truth, so
+     * the model sees the same history the user sees, minus earlier reasoning blocks.
+     */
+    private fun executeInference(conversationId: String, systemPrompt: String) {
         activeGenerationJob?.cancel()
         activeGenerationJob = viewModelScope.launch {
             val params = settingsDataStore.inferenceParams.first()
+            val enabledPlugins = settingsDataStore.enabledPluginIds.first()
+            val effectiveSystemPrompt = PluginRegistry.buildSystemPrompt(systemPrompt, enabledPlugins)
+            val history = conversationRepository.getMessagesOnce(conversationId)
+                .filter { it.role == "user" || it.role == "assistant" }
+                .takeLast(MAX_HISTORY_MESSAGES)
+                .map { message ->
+                    ChatTurn(
+                        role = message.role,
+                        content = if (message.role == "assistant") {
+                            ReasoningText.answerOf(message.content)
+                        } else {
+                            message.content
+                        }
+                    )
+                }
             val fullResponseBuilder = StringBuilder()
 
             try {
-                engine.generate(prompt, systemPrompt, params).collect { chunk ->
+                engine.generate(history, effectiveSystemPrompt, params).collect { chunk ->
                     if (chunk.token.isNotEmpty()) {
                         fullResponseBuilder.append(chunk.token)
                         _uiState.update {
@@ -239,7 +295,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
                     if (chunk.isFinished) {
                         val finalResponse = fullResponseBuilder.toString().ifBlank {
-                            "Response generated on local device."
+                            "(no output)"
                         }
                         val stats = chunk.stats ?: engine.getPerformanceStats()
 
@@ -328,6 +384,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setSystemPromptDialogVisible(visible: Boolean) {
         _uiState.update { it.copy(showSystemPromptDialog = visible) }
+    }
+
+    /** Called when the chat screen becomes visible again, e.g. after downloading in the library. */
+    fun refreshModels() {
+        viewModelScope.launch { modelRepository.refreshDownloadedModels() }
     }
 
     fun setModelSwitchDialogVisible(visible: Boolean) {
