@@ -70,9 +70,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private var activeGenerationJob: Job? = null
 
+    /** Collector for the selected conversation's messages; replaced whenever the chat changes. */
+    private var messagesJob: Job? = null
+
     private companion object {
         /** Older turns are dropped so the prompt keeps fitting into small mobile contexts. */
         const val MAX_HISTORY_MESSAGES = 20
+        const val DEFAULT_CHAT_TITLE = "New chat"
     }
 
     init {
@@ -104,12 +108,27 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectConversation(conversationId: String) {
-        viewModelScope.launch {
+        // Without this, every switch left an old collector running and the two fought over
+        // uiState.messages, so messages from another chat could appear in this one.
+        messagesJob?.cancel()
+        messagesJob = viewModelScope.launch {
             val conv = conversationRepository.getConversationById(conversationId) ?: return@launch
-            _uiState.update { it.copy(currentConversation = conv, systemPromptDraft = conv.systemPrompt) }
+            _uiState.update {
+                it.copy(
+                    currentConversation = conv,
+                    systemPromptDraft = conv.systemPrompt,
+                    messages = emptyList()
+                )
+            }
 
             conversationRepository.getMessages(conversationId).collect { msgList ->
-                _uiState.update { it.copy(messages = msgList) }
+                _uiState.update { state ->
+                    if (state.currentConversation?.id == conversationId) {
+                        state.copy(messages = msgList)
+                    } else {
+                        state
+                    }
+                }
             }
         }
     }
@@ -119,7 +138,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val modelName = engine.activeModelName ?: "Default"
             val modelPath = engine.activeModelPath ?: ""
             val conv = conversationRepository.createConversation(
-                title = "New Chat",
+                title = DEFAULT_CHAT_TITLE,
                 modelUsed = modelName,
                 modelPath = modelPath
             )
@@ -178,6 +197,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 role = "user",
                 content = text
             )
+
+            // Name the chat after its first message instead of leaving it as "New chat".
+            if (conv.title.isBlank() || conv.title == DEFAULT_CHAT_TITLE) {
+                val title = text.lineSequence().first().trim().take(40).ifBlank { DEFAULT_CHAT_TITLE }
+                conversationRepository.renameConversation(conv.id, title)
+                _uiState.update { it.copy(currentConversation = it.currentConversation?.copy(title = title)) }
+            }
 
             executeInference(conv.id, conv.systemPrompt)
         }

@@ -95,17 +95,17 @@ fun ModelListItem(
                 }
             )
             .clickable { onToggleExpanded() }
-            .padding(14.dp)
+            .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.Top) {
             ModelLogo(
                 modelName = model.name,
                 author = model.author,
                 architecture = model.architecture,
-                size = 36.dp
+                size = 44.dp
             )
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -115,9 +115,9 @@ fun ModelListItem(
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
+                        modifier = Modifier.weight(1f)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "· ${selectedVariant.fileSize}",
                         style = MaterialTheme.typography.labelMedium,
@@ -125,7 +125,7 @@ fun ModelListItem(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
                     text = model.description,
@@ -135,7 +135,7 @@ fun ModelListItem(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     modelTags(model, selectedVariant, compatibility).forEach { tag ->
@@ -184,7 +184,7 @@ fun ModelListItem(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         when {
             isDownloading && downloadTask != null -> DownloadProgress(
@@ -202,14 +202,18 @@ fun ModelListItem(
             ) {
                 OutlinedButton(
                     onClick = onDeleteModel,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(46.dp),
                     shape = MaterialTheme.shapes.small
                 ) {
                     Text("Delete", color = MaterialTheme.colorScheme.error)
                 }
                 Button(
                     onClick = if (isLoaded) onChatWithModel else onLoadModel,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(46.dp),
                     shape = MaterialTheme.shapes.small,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -222,7 +226,9 @@ fun ModelListItem(
 
             else -> Button(
                 onClick = onDownloadClick,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp),
                 shape = MaterialTheme.shapes.small,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,

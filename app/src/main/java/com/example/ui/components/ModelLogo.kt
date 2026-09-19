@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,10 +14,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.R
+import com.example.ui.theme.VipoLogoTile
 
 /**
- * Model family marks. Each family is drawn with its own vendor logo so a model is recognisable at
- * a glance; the logos identify whose model it is and are not Vipo's own branding.
+ * Model family marks. Each family shows its vendor's own logo on a light tile, the way local-model
+ * apps present them; the logos identify whose model it is and are not Vipo's branding.
  */
 enum class ModelBrand(val label: String, @param:DrawableRes val logoRes: Int) {
     META("Meta", R.drawable.logo_meta),
@@ -60,19 +60,19 @@ enum class ModelBrand(val label: String, @param:DrawableRes val logoRes: Int) {
 fun ModelLogo(
     brand: ModelBrand,
     modifier: Modifier = Modifier,
-    size: Dp = 38.dp
+    size: Dp = 44.dp
 ) {
     Box(
         modifier = modifier
             .size(size)
-            .clip(RoundedCornerShape(size / 3.4f))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .clip(RoundedCornerShape(size / 3.6f))
+            .background(VipoLogoTile),
         contentAlignment = Alignment.Center
     ) {
         Image(
             painter = painterResource(brand.logoRes),
             contentDescription = brand.label,
-            modifier = Modifier.size(size * 0.62f)
+            modifier = Modifier.size(size * 0.64f)
         )
     }
 }
@@ -84,7 +84,7 @@ fun ModelLogo(
     author: String? = null,
     architecture: String? = null,
     modifier: Modifier = Modifier,
-    size: Dp = 38.dp
+    size: Dp = 44.dp
 ) {
     ModelLogo(
         brand = ModelBrand.of(modelName, author, architecture),

@@ -2,24 +2,27 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Vipo minimal palette: neutral greys, a single quiet accent, muted status colors.
-val VipoBackground = Color(0xFF0B0B0C)
-val VipoSurface = Color(0xFF121214)
-val VipoSurfaceVariant = Color(0xFF17171A)
-val VipoSurfaceContainer = Color(0xFF1C1C20)
-val VipoBorder = Color(0xFF26262B)
-val VipoBorderSubtle = Color(0xFF1B1B1F)
+// Minimal palette: black canvas, two grey elevations, white ink, muted status colours.
+val VipoBackground = Color(0xFF0A0A0B)
+val VipoSurface = Color(0xFF141417)
+val VipoSurfaceVariant = Color(0xFF1C1C20)
+val VipoSurfaceContainer = Color(0xFF232329)
+val VipoBorder = Color(0xFF2C2C33)
+val VipoBorderSubtle = Color(0xFF1F1F24)
 
-val VipoTextPrimary = Color(0xFFEDEDEF)
-val VipoTextSecondary = Color(0xFF9A9AA3)
-val VipoTextMuted = Color(0xFF6A6A73)
+val VipoTextPrimary = Color(0xFFF7F7F8)
+val VipoTextSecondary = Color(0xFF9FA0A8)
+val VipoTextMuted = Color(0xFF6E6F77)
 
-// Primary is a near-white ink: buttons stay quiet and read as part of the text layer.
-val VipoInk = Color(0xFFF0F0F2)
-val VipoAccent = Color(0xFF8A8FF5) // used sparingly for selection and links
-val VipoAccentGlow = Color(0xFFA3A7F8)
-val VipoCyan = Color(0xFF7FB6D9) // metrics
-val VipoGreen = Color(0xFF7FC7A1) // ready / excellent
-val VipoAmber = Color(0xFFD9B872) // usable
-val VipoOrange = Color(0xFFD99B6C) // slow
-val VipoRed = Color(0xFFDD8080) // memory risk / destructive
+// Primary actions are plain white, the way the reference apps do it.
+val VipoInk = Color(0xFFFFFFFF)
+val VipoAccent = Color(0xFF8E8FF7)
+val VipoAccentGlow = Color(0xFFA9AAF9)
+val VipoCyan = Color(0xFF79B8DC)
+val VipoGreen = Color(0xFF6FC48F)
+val VipoAmber = Color(0xFFD9B46B)
+val VipoOrange = Color(0xFFDB9A63)
+val VipoRed = Color(0xFFE07C7C)
+
+/** Logos sit on a light tile so vendor colours keep their contrast on a dark UI. */
+val VipoLogoTile = Color(0xFFF2F2F5)

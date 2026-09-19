@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,28 +25,29 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
@@ -78,10 +80,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
@@ -128,8 +129,8 @@ fun ChatScreen(
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
-                drawerShape = RoundedCornerShape(topEnd = 18.dp, bottomEnd = 18.dp),
-                modifier = Modifier.width(304.dp)
+                drawerShape = RoundedCornerShape(topEnd = 26.dp, bottomEnd = 26.dp),
+                modifier = Modifier.width(310.dp)
             ) {
                 NavigationDrawerContent(
                     conversations = conversations,
@@ -167,34 +168,10 @@ fun ChatScreen(
             topBar = {
                 TopAppBar(
                     title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clip(MaterialTheme.shapes.small)
-                                .clickable { viewModel.setModelSwitchDialogVisible(true) }
-                                .padding(horizontal = 6.dp, vertical = 4.dp)
-                        ) {
-                            ModelLogo(
-                                modelName = uiState.activeModelName ?: "Vipo",
-                                size = 26.dp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = uiState.activeModelName ?: "Choose a model",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.widthIn(max = 180.dp)
-                            )
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Icon(
-                                imageVector = Icons.Default.UnfoldMore,
-                                contentDescription = "Switch model",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(15.dp)
-                            )
-                        }
+                        ModelPill(
+                            modelName = uiState.activeModelName,
+                            onClick = { viewModel.setModelSwitchDialogVisible(true) }
+                        )
                     },
                     navigationIcon = {
                         IconButton(onClick = { scope.launch { drawerState.open() } }) {
@@ -203,7 +180,7 @@ fun ChatScreen(
                     },
                     actions = {
                         IconButton(onClick = { viewModel.newConversation() }) {
-                            Icon(Icons.Default.Add, contentDescription = "New chat", modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Add, contentDescription = "New chat", modifier = Modifier.size(22.dp))
                         }
 
                         Box {
@@ -308,17 +285,21 @@ fun ChatScreen(
                     .padding(paddingValues)
                     .imePadding()
             ) {
+                uiState.errorMessage?.let { error ->
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 6.dp)
+                    )
+                }
+
                 if (uiState.messages.isEmpty() && !uiState.isGenerating) {
                     EmptyChatWelcome(
                         isModelLoaded = uiState.isModelLoaded,
-                        activePluginCount = enabledPlugins.size,
-                        onSuggestionClick = { prompt ->
-                            viewModel.onInputTextChanged(prompt)
-                            viewModel.sendMessage()
-                        },
                         onOpenLibrary = onNavigateToLibrary,
-                        onOpenPlugins = onNavigateToPlugins,
-                        onNewChat = { viewModel.newConversation() },
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
@@ -329,8 +310,8 @@ fun ChatScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(18.dp)
+                            .padding(horizontal = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(22.dp)
                     ) {
                         items(uiState.messages, key = { it.id }) { message ->
                             ChatMessageBubble(
@@ -364,6 +345,15 @@ fun ChatScreen(
                             }
                         }
                     }
+                }
+
+                if (uiState.messages.isEmpty() && !uiState.isGenerating && uiState.isModelLoaded) {
+                    SuggestionRow(
+                        onSuggestionClick = { prompt ->
+                            viewModel.onInputTextChanged(prompt)
+                            viewModel.sendMessage()
+                        }
+                    )
                 }
 
                 ChatInputBar(
@@ -406,7 +396,7 @@ fun ChatScreen(
                         onValueChange = { viewModel.onSystemPromptDraftChanged(it) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(140.dp),
+                            .height(150.dp),
                         placeholder = { Text("You are Vipo, a private on-device assistant...") }
                     )
                 }
@@ -427,13 +417,11 @@ fun ChatScreen(
             title = { Text("Models on this device") },
             text = {
                 if (downloadedModels.isEmpty()) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                        Text(
-                            text = "No models downloaded yet. Open the library to get one.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = "No models downloaded yet. Open the library to get one.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxWidth()) {
                         items(downloadedModels, key = { it.id }) { model ->
@@ -443,15 +431,15 @@ fun ChatScreen(
                                     .fillMaxWidth()
                                     .clip(MaterialTheme.shapes.small)
                                     .clickable { viewModel.switchModel(model.filePath, model.displayName) }
-                                    .padding(vertical = 9.dp, horizontal = 4.dp),
+                                    .padding(vertical = 10.dp, horizontal = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 ModelLogo(
                                     modelName = model.displayName,
                                     architecture = model.architecture,
-                                    size = 30.dp
+                                    size = 36.dp
                                 )
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = model.displayName,
@@ -471,7 +459,7 @@ fun ChatScreen(
                                         Icons.Default.Check,
                                         contentDescription = "Active",
                                         tint = VipoGreen,
-                                        modifier = Modifier.size(17.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
@@ -494,18 +482,44 @@ fun ChatScreen(
     }
 }
 
+/** The model selector in the app bar: logo, name, chevron - one tap to switch. */
+@Composable
+private fun ModelPill(modelName: String?, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surface)
+            .clickable { onClick() }
+            .padding(start = 6.dp, end = 10.dp, top = 5.dp, bottom = 5.dp)
+    ) {
+        ModelLogo(modelName = modelName ?: "Vipo", size = 24.dp)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = modelName ?: "Choose a model",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 170.dp)
+        )
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowDown,
+            contentDescription = "Switch model",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
 @Composable
 fun EmptyChatWelcome(
     isModelLoaded: Boolean,
-    activePluginCount: Int,
-    onSuggestionClick: (String) -> Unit,
     onOpenLibrary: () -> Unit,
-    onOpenPlugins: () -> Unit,
-    onNewChat: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.padding(horizontal = 24.dp),
+        modifier = modifier.padding(horizontal = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -514,91 +528,91 @@ fun EmptyChatWelcome(
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(54.dp)
-                .clip(MaterialTheme.shapes.large)
+                .size(72.dp)
+                .clip(RoundedCornerShape(22.dp))
         )
-        Spacer(modifier = Modifier.height(14.dp))
+
+        Spacer(modifier = Modifier.height(20.dp))
+
         Text(
-            text = "Vipo",
+            text = if (isModelLoaded) "What can I help with?" else "Add a model to start",
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface
         )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "Local models. Nothing leaves your device.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            QuickAction(icon = Icons.Default.Add, label = "New chat", onClick = onNewChat)
-            QuickAction(icon = Icons.AutoMirrored.Filled.LibraryBooks, label = "Library", onClick = onOpenLibrary)
-            QuickAction(
-                icon = Icons.Default.Extension,
-                label = if (activePluginCount > 0) "Plugins · $activePluginCount" else "Plugins",
-                onClick = onOpenPlugins
-            )
-        }
-
-        Spacer(modifier = Modifier.height(28.dp))
 
         if (!isModelLoaded) {
+            Spacer(modifier = Modifier.height(10.dp))
             Text(
-                text = "No model loaded yet. Download one from the library to start chatting offline.",
-                style = MaterialTheme.typography.bodySmall,
+                text = "Download a model from the library and everything runs on this device.",
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        } else {
-            val suggestions = listOf(
-                "Explain how GGUF quantization works",
-                "Write a Kotlin coroutine that reads a file",
-                "Summarize the text I paste next"
-            )
-            suggestions.forEach { prompt ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 3.dp)
-                        .clip(MaterialTheme.shapes.small)
-                        .background(MaterialTheme.colorScheme.surface)
-                        .clickable { onSuggestionClick(prompt) }
-                        .padding(horizontal = 14.dp, vertical = 12.dp)
-                ) {
-                    Text(
-                        text = prompt,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            Spacer(modifier = Modifier.height(18.dp))
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.primary)
+                    .clickable { onOpenLibrary() }
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.LibraryBooks,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Open library",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
             }
         }
     }
 }
 
+/** Prompt starters, scrolled horizontally just above the input like the reference apps. */
 @Composable
-private fun QuickAction(icon: ImageVector, label: String, onClick: () -> Unit) {
+private fun SuggestionRow(onSuggestionClick: (String) -> Unit) {
+    val suggestions = listOf(
+        "Write professionally",
+        "Explain simply",
+        "Summarize this",
+        "Fix my code",
+        "Surprise me"
+    )
+    val prompts = mapOf(
+        "Write professionally" to "Rewrite the text I paste next in a professional tone.",
+        "Explain simply" to "Explain how a language model works, in simple words.",
+        "Summarize this" to "Summarize the text I paste next in five bullet points.",
+        "Fix my code" to "Find the bug in the code I paste next and explain the fix.",
+        "Surprise me" to "Tell me something surprising and true about computers."
+    )
+
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.surface)
-            .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(15.dp)
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        suggestions.forEach { label ->
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .clickable { onSuggestionClick(prompts[label] ?: label) }
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
     }
 }
 
@@ -616,21 +630,21 @@ fun ThinkingSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
+            .clip(MaterialTheme.shapes.small)
             .background(MaterialTheme.colorScheme.surface)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { expanded = !expanded }
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = Icons.Default.Psychology,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(15.dp)
+                modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
@@ -643,7 +657,7 @@ fun ThinkingSection(
                 imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = if (expanded) "Hide" else "Show",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(18.dp)
             )
         }
 
@@ -652,7 +666,7 @@ fun ThinkingSection(
                 text = thinking,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
+                modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp)
             )
         }
     }
@@ -683,7 +697,7 @@ fun ChatMessageBubble(
                     .fillMaxWidth()
                     .clip(MaterialTheme.shapes.medium)
                     .background(MaterialTheme.colorScheme.surface)
-                    .padding(12.dp)
+                    .padding(14.dp)
             ) {
                 OutlinedTextField(
                     value = editText,
@@ -701,10 +715,10 @@ fun ChatMessageBubble(
             if (isUser) {
                 Box(
                     modifier = Modifier
-                        .widthIn(max = 300.dp)
-                        .clip(RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp))
+                        .widthIn(max = 310.dp)
+                        .clip(RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     Text(
                         text = message.content,
@@ -716,25 +730,16 @@ fun ChatMessageBubble(
                 val parsed = remember(message.content) { ReasoningText.split(message.content) }
                 Column(modifier = Modifier.fillMaxWidth()) {
                     if (parsed.hasThinking) {
-                        ThinkingSection(
-                            thinking = parsed.thinking,
-                            isStreaming = false
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        ThinkingSection(thinking = parsed.thinking, isStreaming = false)
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
-                    // Assistant replies read as plain text, no container.
-                    Text(
-                        text = parsed.answer,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    AssistantText(parsed.answer)
                 }
             }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 2.dp)
+                modifier = Modifier.padding(top = 4.dp)
             ) {
                 if (!isUser && showStats && message.tokensPerSec > 0f) {
                     Text(
@@ -745,37 +750,48 @@ fun ChatMessageBubble(
                     Spacer(modifier = Modifier.width(8.dp))
                 }
 
-                IconButton(onClick = onCopy, modifier = Modifier.size(26.dp)) {
+                IconButton(onClick = onCopy, modifier = Modifier.size(28.dp)) {
                     Icon(
                         Icons.Default.ContentCopy,
                         contentDescription = "Copy",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(13.dp)
+                        modifier = Modifier.size(14.dp)
                     )
                 }
 
                 if (isUser) {
-                    IconButton(onClick = onStartEdit, modifier = Modifier.size(26.dp)) {
+                    IconButton(onClick = onStartEdit, modifier = Modifier.size(28.dp)) {
                         Icon(
                             Icons.Default.Edit,
                             contentDescription = "Edit",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(13.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                     }
                 } else {
-                    IconButton(onClick = onRegenerate, modifier = Modifier.size(26.dp)) {
+                    IconButton(onClick = onRegenerate, modifier = Modifier.size(28.dp)) {
                         Icon(
                             Icons.Default.Refresh,
                             contentDescription = "Regenerate",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(13.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                     }
                 }
             }
         }
     }
+}
+
+/** Assistant answers read as plain text, with no bubble around them. */
+@Composable
+private fun AssistantText(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 @Composable
@@ -789,21 +805,14 @@ fun StreamingAssistantBubble(
 
     Column(modifier = Modifier.fillMaxWidth()) {
         if (parsed.hasThinking) {
-            ThinkingSection(
-                thinking = parsed.thinking,
-                isStreaming = parsed.isThinkingOpen
-            )
+            ThinkingSection(thinking = parsed.thinking, isStreaming = parsed.isThinkingOpen)
             if (parsed.answer.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
 
         if (parsed.answer.isNotEmpty()) {
-            Text(
-                text = parsed.answer,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            AssistantText(parsed.answer)
         } else if (!parsed.hasThinking) {
             Text(
                 text = "Working on device...",
@@ -812,11 +821,11 @@ fun StreamingAssistantBubble(
             )
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             CircularProgressIndicator(
-                modifier = Modifier.size(11.dp),
+                modifier = Modifier.size(12.dp),
                 strokeWidth = 1.5.dp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -831,14 +840,14 @@ fun StreamingAssistantBubble(
             }
             TextButton(
                 onClick = onStop,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp),
-                modifier = Modifier.height(26.dp)
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp),
+                modifier = Modifier.height(28.dp)
             ) {
                 Icon(
                     Icons.Default.Stop,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(13.dp)
+                    modifier = Modifier.size(14.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
@@ -865,7 +874,7 @@ fun ChatInputBar(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.Bottom
     ) {
         OutlinedTextField(
@@ -873,17 +882,18 @@ fun ChatInputBar(
             onValueChange = onTextChange,
             placeholder = {
                 Text(
-                    text = if (isModelLoaded) "Message" else "Load a model to chat",
-                    style = MaterialTheme.typography.bodyMedium
+                    text = if (isModelLoaded) "Ask anything" else "Load a model to chat",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             maxLines = 5,
             modifier = Modifier.weight(1f),
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(28.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                focusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                focusedBorderColor = Color.Transparent,
                 unfocusedBorderColor = Color.Transparent
             )
         )
@@ -901,7 +911,7 @@ fun ChatInputBar(
             },
             enabled = isGenerating || !isModelLoaded || sendEnabled,
             modifier = Modifier
-                .size(44.dp)
+                .size(48.dp)
                 .clip(CircleShape)
                 .background(
                     if (sendEnabled || isGenerating) {
@@ -912,14 +922,14 @@ fun ChatInputBar(
                 )
         ) {
             Icon(
-                imageVector = if (isGenerating) Icons.Default.Stop else Icons.AutoMirrored.Filled.Send,
+                imageVector = if (isGenerating) Icons.Default.Stop else Icons.Default.ArrowUpward,
                 contentDescription = if (isGenerating) "Stop" else "Send",
                 tint = if (sendEnabled || isGenerating) {
                     MaterialTheme.colorScheme.onPrimary
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
-                modifier = Modifier.size(17.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
     }

@@ -90,9 +90,9 @@ fun NavigationDrawerContent(
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .width(304.dp)
+            .width(310.dp)
             .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 12.dp, vertical = 18.dp)
+            .padding(horizontal = 14.dp, vertical = 20.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -121,8 +121,8 @@ fun NavigationDrawerContent(
             onClick = onNewChat,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(44.dp),
-            shape = MaterialTheme.shapes.small,
+                .height(48.dp),
+            shape = RoundedCornerShape(50),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary

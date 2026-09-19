@@ -54,8 +54,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.data.model.ModelCatalogItem
 import com.example.ui.components.DeviceSpecsCard
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -158,31 +160,33 @@ fun LibraryScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
                 OutlinedTextField(
                     value = uiState.searchQuery,
                     onValueChange = { viewModel.onSearchQueryChanged(it) },
-                    placeholder = { Text("Search models", style = MaterialTheme.typography.bodyMedium) },
+                    placeholder = {
+                        Text("Search models", style = MaterialTheme.typography.bodyMedium)
+                    },
                     leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(19.dp))
                     },
                     trailingIcon = {
                         if (uiState.searchQuery.isNotEmpty()) {
                             IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                                Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(17.dp))
                             }
                         }
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
+                    shape = RoundedCornerShape(28.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        focusedBorderColor = MaterialTheme.colorScheme.outline,
-                        unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent
                     )
                 )
             }
@@ -192,7 +196,7 @@ fun LibraryScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     LibraryCategories.ordered.forEach { category ->
                         CategoryChip(
@@ -205,24 +209,10 @@ fun LibraryScreen(
             }
 
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "${models.size} models",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    TextButton(onClick = { viewModel.autoSelect() }) {
-                        Text("Pick for my device", style = MaterialTheme.typography.labelLarge)
-                    }
-                }
-            }
-
-            item {
-                DeviceSpecsCard(hardwareInfo = viewModel.hardwareInfo)
+                DeviceSpecsCard(
+                    hardwareInfo = viewModel.hardwareInfo,
+                    onAutoSelectClick = { viewModel.autoSelect() }
+                )
             }
 
             val installedIds = downloadedModels.mapNotNull { it.modelId }.toSet()
@@ -230,87 +220,21 @@ fun LibraryScreen(
             val available = models.filterNot { installedIds.contains(it.id) }
 
             if (installed.isNotEmpty()) {
-                item(key = "header-installed") { SectionHeader("On this device") }
-            }
-
-            items(installed, key = { "installed-${it.id}" }) { model ->
-                val selectedVariant = uiState.selectedVariants[model.id]
-                    ?: model.variants.firstOrNull { it.name.contains("Q4") }
-                    ?: model.variants.first()
-
-                val downloadedModel = downloadedModels.firstOrNull { it.modelId == model.id }
-                val isLoaded = downloadedModel != null && viewModel.engine.activeModelPath == downloadedModel.filePath
-
-                ModelListItem(
-                    model = model,
-                    selectedVariant = selectedVariant,
-                    compatibility = viewModel.getCompatibility(selectedVariant),
-                    expanded = uiState.expandedModelId == model.id,
-                    highlighted = uiState.highlightedModelId == model.id,
-                    downloadedModel = downloadedModel,
-                    isLoaded = isLoaded,
-                    downloadTask = downloadTasks[model.id],
-                    isFavorite = favoriteIds.contains(model.id),
-                    onToggleExpanded = { viewModel.toggleExpanded(model.id) },
-                    onVariantSelect = { viewModel.selectVariant(model.id, it) },
-                    onDownloadClick = { viewModel.startDownload(model, selectedVariant) },
-                    onPauseDownload = { viewModel.pauseDownload(model.id) },
-                    onResumeDownload = { viewModel.resumeDownload(model.id) },
-                    onCancelDownload = { viewModel.cancelDownload(model.id) },
-                    onRetryDownload = { viewModel.retryDownload(model.id) },
-                    onLoadModel = {
-                        downloadedModel?.let { viewModel.loadModel(it.filePath, model.name) }
-                    },
-                    onChatWithModel = {
-                        downloadedModel?.let { onOpenChatWithModel(it.filePath, model.name) }
-                    },
-                    onDeleteModel = {
-                        downloadedModel?.let { viewModel.deleteModel(it) }
-                    },
-                    onToggleFavorite = { viewModel.toggleFavorite(model.id) }
-                )
+                item(key = "header-installed") {
+                    SectionHeader("On this device", "${installed.size}")
+                }
+                items(installed, key = { "installed-${it.id}" }) { model ->
+                    ModelCard(model, viewModel, downloadedModels, downloadTasks, favoriteIds, uiState, onOpenChatWithModel)
+                }
             }
 
             if (available.isNotEmpty()) {
-                item(key = "header-browse") { SectionHeader("Browse models") }
-            }
-
-            items(available, key = { "browse-${it.id}" }) { model ->
-                val selectedVariant = uiState.selectedVariants[model.id]
-                    ?: model.variants.firstOrNull { it.name.contains("Q4") }
-                    ?: model.variants.first()
-
-                val downloadedModel = downloadedModels.firstOrNull { it.modelId == model.id }
-                val isLoaded = downloadedModel != null && viewModel.engine.activeModelPath == downloadedModel.filePath
-
-                ModelListItem(
-                    model = model,
-                    selectedVariant = selectedVariant,
-                    compatibility = viewModel.getCompatibility(selectedVariant),
-                    expanded = uiState.expandedModelId == model.id,
-                    highlighted = uiState.highlightedModelId == model.id,
-                    downloadedModel = downloadedModel,
-                    isLoaded = isLoaded,
-                    downloadTask = downloadTasks[model.id],
-                    isFavorite = favoriteIds.contains(model.id),
-                    onToggleExpanded = { viewModel.toggleExpanded(model.id) },
-                    onVariantSelect = { viewModel.selectVariant(model.id, it) },
-                    onDownloadClick = { viewModel.startDownload(model, selectedVariant) },
-                    onPauseDownload = { viewModel.pauseDownload(model.id) },
-                    onResumeDownload = { viewModel.resumeDownload(model.id) },
-                    onCancelDownload = { viewModel.cancelDownload(model.id) },
-                    onRetryDownload = { viewModel.retryDownload(model.id) },
-                    onLoadModel = {
-                        downloadedModel?.let { viewModel.loadModel(it.filePath, model.name) }
-                    },
-                    onChatWithModel = {
-                        downloadedModel?.let { onOpenChatWithModel(it.filePath, model.name) }
-                    },
-                    onDeleteModel = {
-                        downloadedModel?.let { viewModel.deleteModel(it) }
-                    },
-                    onToggleFavorite = { viewModel.toggleFavorite(model.id) }
-                )
+                item(key = "header-browse") {
+                    SectionHeader("Browse models", "${available.size}")
+                }
+                items(available, key = { "browse-${it.id}" }) { model ->
+                    ModelCard(model, viewModel, downloadedModels, downloadTasks, favoriteIds, uiState, onOpenChatWithModel)
+                }
             }
 
             if (models.isEmpty()) {
@@ -318,7 +242,7 @@ fun LibraryScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 48.dp),
+                            .padding(vertical = 56.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
@@ -340,7 +264,7 @@ fun LibraryScreen(
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(24.dp)) }
+            item { Spacer(modifier = Modifier.height(28.dp)) }
         }
     }
 
@@ -352,14 +276,68 @@ fun LibraryScreen(
     }
 }
 
+/** Wires one catalog entry to the view model; kept here so both sections stay in sync. */
 @Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
+private fun ModelCard(
+    model: ModelCatalogItem,
+    viewModel: LibraryViewModel,
+    downloadedModels: List<com.example.data.model.DownloadedModel>,
+    downloadTasks: Map<String, com.example.download.DownloadTask>,
+    favoriteIds: Set<String>,
+    uiState: LibraryUiState,
+    onOpenChatWithModel: (String, String) -> Unit
+) {
+    val selectedVariant = uiState.selectedVariants[model.id]
+        ?: model.variants.firstOrNull { it.name.contains("Q4") }
+        ?: model.variants.first()
+
+    val downloadedModel = downloadedModels.firstOrNull { it.modelId == model.id }
+    val isLoaded = downloadedModel != null && viewModel.engine.activeModelPath == downloadedModel.filePath
+
+    ModelListItem(
+        model = model,
+        selectedVariant = selectedVariant,
+        compatibility = viewModel.getCompatibility(selectedVariant),
+        expanded = uiState.expandedModelId == model.id,
+        highlighted = uiState.highlightedModelId == model.id,
+        downloadedModel = downloadedModel,
+        isLoaded = isLoaded,
+        downloadTask = downloadTasks[model.id],
+        isFavorite = favoriteIds.contains(model.id),
+        onToggleExpanded = { viewModel.toggleExpanded(model.id) },
+        onVariantSelect = { viewModel.selectVariant(model.id, it) },
+        onDownloadClick = { viewModel.startDownload(model, selectedVariant) },
+        onPauseDownload = { viewModel.pauseDownload(model.id) },
+        onResumeDownload = { viewModel.resumeDownload(model.id) },
+        onCancelDownload = { viewModel.cancelDownload(model.id) },
+        onRetryDownload = { viewModel.retryDownload(model.id) },
+        onLoadModel = { downloadedModel?.let { viewModel.loadModel(it.filePath, model.name) } },
+        onChatWithModel = { downloadedModel?.let { onOpenChatWithModel(it.filePath, model.name) } },
+        onDeleteModel = { downloadedModel?.let { viewModel.deleteModel(it) } },
+        onToggleFavorite = { viewModel.toggleFavorite(model.id) }
     )
+}
+
+@Composable
+private fun SectionHeader(title: String, count: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = count,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }
 
 @Composable
@@ -372,10 +350,10 @@ private fun CategoryChip(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
             .background(
-                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
             )
             .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 7.dp)
+            .padding(horizontal = 16.dp, vertical = 9.dp)
     ) {
         Text(
             text = label,

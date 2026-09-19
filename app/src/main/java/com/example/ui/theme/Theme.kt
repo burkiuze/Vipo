@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.Color
 
 private val VipoDarkColorScheme = darkColorScheme(
     primary = VipoInk,
-    onPrimary = Color(0xFF0B0B0C),
+    onPrimary = Color(0xFF0A0A0B),
     primaryContainer = VipoSurfaceContainer,
     onPrimaryContainer = VipoTextPrimary,
     secondary = VipoTextSecondary,
@@ -15,7 +15,7 @@ private val VipoDarkColorScheme = darkColorScheme(
     secondaryContainer = VipoSurfaceVariant,
     onSecondaryContainer = VipoTextPrimary,
     tertiary = VipoAccent,
-    onTertiary = Color(0xFF0B0B0C),
+    onTertiary = Color(0xFF0A0A0B),
     tertiaryContainer = VipoSurfaceVariant,
     onTertiaryContainer = VipoTextPrimary,
     background = VipoBackground,
@@ -28,8 +28,8 @@ private val VipoDarkColorScheme = darkColorScheme(
     outline = VipoBorder,
     outlineVariant = VipoBorderSubtle,
     error = VipoRed,
-    onError = Color(0xFF0B0B0C),
-    errorContainer = Color(0xFF241718),
+    onError = Color(0xFF0A0A0B),
+    errorContainer = Color(0xFF2A1A1B),
     onErrorContainer = VipoRed
 )
 
@@ -41,9 +41,9 @@ fun VipoTheme(
     val colorScheme = if (pureBlack) {
         VipoDarkColorScheme.copy(
             background = Color(0xFF000000),
-            surface = Color(0xFF0A0A0B),
-            surfaceVariant = Color(0xFF121214),
-            surfaceContainer = Color(0xFF161618)
+            surface = Color(0xFF101013),
+            surfaceVariant = Color(0xFF17171B),
+            surfaceContainer = Color(0xFF1D1D22)
         )
     } else {
         VipoDarkColorScheme
