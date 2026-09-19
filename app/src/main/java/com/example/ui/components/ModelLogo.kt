@@ -6,10 +6,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -17,22 +21,22 @@ import com.example.R
 import com.example.ui.theme.VipoLogoTile
 
 /**
- * Model family marks. Each family shows its vendor's own logo on a light tile, the way local-model
- * apps present them; the logos identify whose model it is and are not Vipo's branding.
+ * Model family marks: each family shows its vendor's own logo, taken from the lobe-icons set
+ * (MIT) rather than redrawn. Models with no published mark fall back to a neutral chip icon.
  */
-enum class ModelBrand(val label: String, @param:DrawableRes val logoRes: Int) {
+enum class ModelBrand(val label: String, @param:DrawableRes val logoRes: Int?) {
     META("Meta", R.drawable.logo_meta),
     QWEN("Qwen", R.drawable.logo_qwen),
-    GEMMA("Google", R.drawable.logo_google),
+    GEMMA("Google Gemma", R.drawable.logo_gemma),
     PHI("Microsoft", R.drawable.logo_microsoft),
     DEEPSEEK("DeepSeek", R.drawable.logo_deepseek),
     SMOLLM("Hugging Face", R.drawable.logo_huggingface),
-    TINYLLAMA("TinyLlama", R.drawable.logo_tinyllama),
-    STARCODER("BigCode", R.drawable.logo_bigcode),
+    STARCODER("BigCode", R.drawable.logo_huggingface),
     STABLELM("Stability AI", R.drawable.logo_stability),
     FALCON("TII", R.drawable.logo_falcon),
     MISTRAL("Mistral AI", R.drawable.logo_mistral),
-    GENERIC("GGUF", R.drawable.logo_gguf);
+    TINYLLAMA("TinyLlama", null),
+    GENERIC("GGUF", null);
 
     companion object {
         /** Resolves a family from whatever we know about a model: id, name, author, architecture. */
@@ -69,11 +73,21 @@ fun ModelLogo(
             .background(VipoLogoTile),
         contentAlignment = Alignment.Center
     ) {
-        Image(
-            painter = painterResource(brand.logoRes),
-            contentDescription = brand.label,
-            modifier = Modifier.size(size * 0.64f)
-        )
+        val logoRes = brand.logoRes
+        if (logoRes != null) {
+            Image(
+                painter = painterResource(logoRes),
+                contentDescription = brand.label,
+                modifier = Modifier.size(size * 0.64f)
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.Memory,
+                contentDescription = brand.label,
+                tint = Color(0xFF3B3B42),
+                modifier = Modifier.size(size * 0.58f)
+            )
+        }
     }
 }
 

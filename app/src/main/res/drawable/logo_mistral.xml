@@ -1,12 +1,23 @@
-<!-- Mistral AI's striped mark, used to identify Mistral models. -->
+<!-- Mistral AI. Converted from lobehub/lobe-icons (MIT). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="48"
-    android:viewportHeight="48">
-    <path android:fillColor="#FFD800" android:pathData="M6,8h7v7h-7z M35,8h7v7h-7z" />
-    <path android:fillColor="#FFAF00" android:pathData="M6,15h7v7h-7z M20.5,15h7v7h-7z M35,15h7v7h-7z" />
-    <path android:fillColor="#FF8205" android:pathData="M6,22h7v7h-7z M13,22h7v7h-7z M20.5,22h7v7h-7z M28,22h7v7h-7z M35,22h7v7h-7z" />
-    <path android:fillColor="#FA500F" android:pathData="M6,29h7v7h-7z M20.5,29h7v7h-7z M35,29h7v7h-7z" />
-    <path android:fillColor="#E10500" android:pathData="M6,36h7v7h-7z M20.5,36h7v7h-7z M35,36h7v7h-7z" />
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M3.428 3.4h3.429v3.428H3.428V3.4zm13.714 0h3.43v3.428h-3.43V3.4z"
+        android:fillColor="#FFFFD700" />
+    <path
+        android:pathData="M3.428 6.828h6.857v3.429H3.429V6.828zm10.286 0h6.857v3.429h-6.857V6.828z"
+        android:fillColor="#FFFFAF00" />
+    <path
+        android:pathData="M3.428 10.258h17.144v3.428H3.428v-3.428z"
+        android:fillColor="#FFFF8205" />
+    <path
+        android:pathData="M3.428 13.686h3.429v3.428H3.428v-3.428zm6.858 0h3.429v3.428h-3.429v-3.428zm6.856 0h3.43v3.428h-3.43v-3.428z"
+        android:fillColor="#FFFA500F" />
+    <path
+        android:pathData="M0 17.114h10.286v3.429H0v-3.429zm13.714 0H24v3.429H13.714v-3.429z"
+        android:fillColor="#FFE10500" />
 </vector>

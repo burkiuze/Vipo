@@ -47,6 +47,7 @@ class PluginAndBrandTest {
         assertEquals(ModelBrand.PHI, ModelBrand.of("Phi 3.5 Mini Instruct", "Microsoft", "phi3"))
         assertEquals(ModelBrand.SMOLLM, ModelBrand.of("SmolLM2 360M Instruct", "Hugging Face", "llama"))
         assertEquals(ModelBrand.TINYLLAMA, ModelBrand.of("TinyLlama 1.1B Chat", "TinyLlama Project", "llama"))
+        assertEquals(ModelBrand.MISTRAL, ModelBrand.of("Mistral 7B Instruct v0.3", "Mistral AI", "llama"))
         // DeepSeek distills carry another family's architecture, the name has to win.
         assertEquals(ModelBrand.DEEPSEEK, ModelBrand.of("DeepSeek R1 Distill Qwen 1.5B", "DeepSeek", "qwen2"))
         assertEquals(ModelBrand.GENERIC, ModelBrand.of("my-custom-model", null, null))
